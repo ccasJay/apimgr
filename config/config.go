@@ -6,13 +6,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 )
 
 // APIConfig represents a single API configuration
 type APIConfig struct {
 	Alias     string `json:"alias"`
 	APIKey    string `json:"api_key"`
+	AuthToken string `json:"auth_token"`
 	BaseURL   string `json:"base_url"`
 	Model     string `json:"model"`
 }
@@ -29,12 +29,7 @@ func NewConfigManager() *ConfigManager {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
-	var configPath string
-	if runtime.GOOS == "windows" {
-		configPath = filepath.Join(homeDir, ".apimgr.json")
-	} else {
-		configPath = filepath.Join(homeDir, ".apimgr.json")
-	}
+	configPath := filepath.Join(homeDir, ".apimgr.json")
 
 	return &ConfigManager{
 		configPath: configPath,
@@ -152,8 +147,9 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 		return fmt.Errorf("别名不能为空")
 	}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("API密钥不能为空")
+	// 至少需要一种认证方式
+	if config.APIKey == "" && config.AuthToken == "" {
+		return fmt.Errorf("API密钥和认证令牌不能同时为空")
 	}
 
 	if config.BaseURL != "" {

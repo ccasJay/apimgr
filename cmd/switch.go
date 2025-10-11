@@ -24,7 +24,12 @@ var SwitchCmd = &cobra.Command{
 		}
 
 		// 输出export命令，用户需要通过eval执行
-		fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
+		if apiConfig.APIKey != "" {
+			fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
+		}
+		if apiConfig.AuthToken != "" {
+			fmt.Printf("export ANTHROPIC_AUTH_TOKEN=\"%s\"\n", apiConfig.AuthToken)
+		}
 		if apiConfig.BaseURL != "" {
 			fmt.Printf("export ANTHROPIC_API_BASE=\"%s\"\n", apiConfig.BaseURL)
 		}

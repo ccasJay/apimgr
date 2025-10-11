@@ -28,10 +28,15 @@ var ListCmd = &cobra.Command{
 
 		fmt.Println("可用的配置:")
 		for _, config := range configs {
-			// 脱敏显示API密钥
-			maskedKey := utils.MaskAPIKey(config.APIKey)
+			// 脱敏显示API密钥或认证令牌
+			var authInfo string
+			if config.APIKey != "" {
+				authInfo = "API Key: " + utils.MaskAPIKey(config.APIKey)
+			} else {
+				authInfo = "Auth Token: " + utils.MaskAPIKey(config.AuthToken)
+			}
 			fmt.Printf("  %s: %s (URL: %s, Model: %s)\n",
-				config.Alias, maskedKey, config.BaseURL, config.Model)
+				config.Alias, authInfo, config.BaseURL, config.Model)
 		}
 	},
 }
