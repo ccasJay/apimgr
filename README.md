@@ -141,14 +141,18 @@ apimgr remove <别名>
 ## 开发
 
 ```bash
-# 构建
+# 构建（推荐使用Makefile）
+make install
+
+# 或者手动构建和安装
 go build -o apimgr .
+sudo cp apimgr /usr/local/bin/apimgr
 
 # 运行测试
 go test ./...
 
 # 清理
-rm apimgr
+make clean
 ```
 
 ## 许可证
