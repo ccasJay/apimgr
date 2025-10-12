@@ -21,6 +21,8 @@ func main() {
 	rootCmd.AddCommand(cmd.ListCmd)
 	rootCmd.AddCommand(cmd.RemoveCmd)
 	rootCmd.AddCommand(cmd.StatusCmd)
+	rootCmd.AddCommand(cmd.LoadActiveCmd)
+	rootCmd.AddCommand(cmd.InstallCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

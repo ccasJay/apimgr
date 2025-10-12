@@ -26,6 +26,9 @@ var ListCmd = &cobra.Command{
 			return
 		}
 
+		// Get active configuration name
+		activeName, _ := configManager.GetActiveName()
+
 		fmt.Println("可用的配置:")
 		for _, config := range configs {
 			// 脱敏显示API密钥或认证令牌
@@ -35,8 +38,19 @@ var ListCmd = &cobra.Command{
 			} else {
 				authInfo = "Auth Token: " + utils.MaskAPIKey(config.AuthToken)
 			}
-			fmt.Printf("  %s: %s (URL: %s, Model: %s)\n",
-				config.Alias, authInfo, config.BaseURL, config.Model)
+			
+			// Mark active configuration with *
+			activeMarker := " "
+			if config.Alias == activeName {
+				activeMarker = "*"
+			}
+			
+			fmt.Printf("%s %s: %s (URL: %s, Model: %s)\n",
+				activeMarker, config.Alias, authInfo, config.BaseURL, config.Model)
+		}
+		
+		if activeName != "" {
+			fmt.Printf("\n* 表示当前活动配置\n")
 		}
 	},
 }

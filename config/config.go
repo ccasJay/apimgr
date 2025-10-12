@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // APIConfig represents a single API configuration
@@ -15,6 +16,12 @@ type APIConfig struct {
 	AuthToken string `json:"auth_token"`
 	BaseURL   string `json:"base_url"`
 	Model     string `json:"model"`
+}
+
+// ConfigFile represents the structure of the config file
+type ConfigFile struct {
+	Active  string      `json:"active"`
+	Configs []APIConfig `json:"configs"`
 }
 
 // ConfigManager manages API configurations
@@ -41,10 +48,10 @@ func (cm *ConfigManager) GetConfigPath() string {
 	return cm.configPath
 }
 
-// Load loads all configurations from the config file
-func (cm *ConfigManager) Load() ([]APIConfig, error) {
+// loadConfigFile loads the config file with locking
+func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
 	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
-		return []APIConfig{}, nil
+		return &ConfigFile{Configs: []APIConfig{}}, nil
 	}
 
 	data, err := os.ReadFile(cm.configPath)
@@ -52,22 +59,27 @@ func (cm *ConfigManager) Load() ([]APIConfig, error) {
 		return nil, fmt.Errorf("读取配置文件失败: %v", err)
 	}
 
-	var configs []APIConfig
 	if len(data) == 0 {
-		return configs, nil
+		return &ConfigFile{Configs: []APIConfig{}}, nil
 	}
 
-	err = json.Unmarshal(data, &configs)
+	var configFile ConfigFile
+	err = json.Unmarshal(data, &configFile)
 	if err != nil {
+		// Try to parse as old format (array of configs)
+		var configs []APIConfig
+		if err2 := json.Unmarshal(data, &configs); err2 == nil {
+			return &ConfigFile{Configs: configs}, nil
+		}
 		return nil, fmt.Errorf("解析配置文件失败: %v", err)
 	}
 
-	return configs, nil
+	return &configFile, nil
 }
 
-// Save saves configurations to the config file
-func (cm *ConfigManager) Save(configs []APIConfig) error {
-	data, err := json.MarshalIndent(configs, "", "  ")
+// saveConfigFile saves the config file with locking
+func (cm *ConfigManager) saveConfigFile(configFile *ConfigFile) error {
+	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %v", err)
 	}
@@ -78,6 +90,35 @@ func (cm *ConfigManager) Save(configs []APIConfig) error {
 	}
 
 	return nil
+}
+
+// lockFile locks the config file
+func (cm *ConfigManager) lockFile(file *os.File) error {
+	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX)
+}
+
+// unlockFile unlocks the config file
+func (cm *ConfigManager) unlockFile(file *os.File) error {
+	return syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+}
+
+// Load loads all configurations from the config file
+func (cm *ConfigManager) Load() ([]APIConfig, error) {
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return nil, err
+	}
+	return configFile.Configs, nil
+}
+
+// Save saves configurations to the config file
+func (cm *ConfigManager) Save(configs []APIConfig) error {
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return err
+	}
+	configFile.Configs = configs
+	return cm.saveConfigFile(configFile)
 }
 
 // Add adds a new configuration
@@ -139,6 +180,59 @@ func (cm *ConfigManager) Get(alias string) (*APIConfig, error) {
 // List returns all configurations
 func (cm *ConfigManager) List() ([]APIConfig, error) {
 	return cm.Load()
+}
+
+// SetActive sets the active configuration
+func (cm *ConfigManager) SetActive(alias string) error {
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return err
+	}
+
+	// Verify the alias exists
+	found := false
+	for _, config := range configFile.Configs {
+		if config.Alias == alias {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("配置 '%s' 不存在", alias)
+	}
+
+	configFile.Active = alias
+	return cm.saveConfigFile(configFile)
+}
+
+// GetActive returns the active configuration
+func (cm *ConfigManager) GetActive() (*APIConfig, error) {
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	if configFile.Active == "" {
+		return nil, fmt.Errorf("未设置活动配置")
+	}
+
+	for _, config := range configFile.Configs {
+		if config.Alias == configFile.Active {
+			return &config, nil
+		}
+	}
+
+	return nil, fmt.Errorf("活动配置 '%s' 不存在", configFile.Active)
+}
+
+// GetActiveName returns the active configuration name
+func (cm *ConfigManager) GetActiveName() (string, error) {
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return "", err
+	}
+	return configFile.Active, nil
 }
 
 // validateConfig validates a configuration
