@@ -71,10 +71,16 @@ func TestValidateConfig(t *testing.T) {
 		t.Errorf("期望别名不能为空错误，实际: %v", err)
 	}
 
-	// 测试空API密钥
-	err = cm.validateConfig(APIConfig{Alias: "test", APIKey: ""})
-	if err == nil || err.Error() != "API密钥不能为空" {
-		t.Errorf("期望API密钥不能为空错误，实际: %v", err)
+	// 测试认证方式缺失
+	err = cm.validateConfig(APIConfig{Alias: "test"})
+	if err == nil || err.Error() != "API密钥和认证令牌不能同时为空" {
+		t.Errorf("期望认证方式缺失错误，实际: %v", err)
+	}
+
+	// 测试仅使用认证令牌
+	err = cm.validateConfig(APIConfig{Alias: "test", AuthToken: "token"})
+	if err != nil {
+		t.Errorf("仅认证令牌配置不应报错: %v", err)
 	}
 
 	// 测试无效URL

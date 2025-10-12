@@ -48,6 +48,7 @@ if command -v apimgr &> /dev/null; then
   eval "$(command apimgr load-active)"
   
   # Wrap apimgr command to handle 'switch' automatically
+  # This allows 'apimgr switch' to directly modify environment variables
   apimgr() {
     if [ "${1-}" = "switch" ]; then
       shift
@@ -147,12 +148,21 @@ fi
 		}
 		defer f.Close()
 
-		if _, err := f.WriteString(initScript); err != nil {
+		// Write the script to the file
+		bytesWritten, err := f.WriteString(initScript)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: 无法写入 %s: %v\n", rcFile, err)
 			os.Exit(1)
 		}
+		
+		// Close file explicitly to ensure content is flushed to disk
+		err = f.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "错误: 无法关闭文件 %s: %v\n", rcFile, err)
+			os.Exit(1)
+		}
 
-		fmt.Printf("✓ 成功安装到 %s\n\n", rcFile)
+		fmt.Printf("✓ 成功安装到 %s (写入 %d 字节)\n\n", rcFile, bytesWritten)
 		fmt.Printf("请运行以下命令使其生效:\n")
 		fmt.Printf("  source %s\n\n", rcFile)
 		fmt.Printf("或者重新打开终端\n\n")
@@ -160,6 +170,16 @@ fi
 		fmt.Printf("  apimgr switch <配置别名>  # 自动切换并应用环境变量\n")
 		fmt.Printf("  apimgr list               # 列出所有配置\n")
 		fmt.Printf("  apimgr status             # 查看当前配置状态\n")
+		
+		// Verify that the file was actually modified by checking if the script exists in the file
+		updatedContent, err := os.ReadFile(rcFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "警告: 无法验证 %s 是否已更新: %v\n", rcFile, err)
+		} else if strings.Contains(string(updatedContent), "apimgr() {") {
+			fmt.Printf("✓ 验证: 配置已成功写入到 %s\n", rcFile)
+		} else {
+			fmt.Fprintf(os.Stderr, "警告: 验证失败，配置可能未正确写入到 %s\n", rcFile)
+		}
 	},
 }
 

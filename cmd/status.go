@@ -21,6 +21,7 @@ var StatusCmd = &cobra.Command{
 
 		if apiKey == "" && authToken == "" {
 			fmt.Println("当前未设置API配置")
+			fmt.Println("\n💡 提示: 运行 'apimgr install' 安装shell集成以自动加载配置")
 			return
 		}
 
@@ -40,5 +41,7 @@ var StatusCmd = &cobra.Command{
 		if model != "" {
 			fmt.Printf("  Model: %s\n", model)
 		}
+		
+		fmt.Println("\n💡 提示: 运行 'apimgr install' 安装shell集成以获得更佳体验")
 	},
 }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
+	"github.com/spf13/cobra"
 )
 
 var LoadActiveCmd = &cobra.Command{
@@ -14,7 +14,7 @@ var LoadActiveCmd = &cobra.Command{
 	Long:  "输出活动配置的环境变量export命令。在shell初始化脚本中使用: eval \"$(apimgr load-active)\"",
 	Run: func(cmd *cobra.Command, args []string) {
 		configManager := config.NewConfigManager()
-		
+
 		// Get the active configuration
 		apiConfig, err := configManager.GetActive()
 		if err != nil {
