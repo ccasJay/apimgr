@@ -36,7 +36,22 @@ func NewConfigManager() *ConfigManager {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
-	configPath := filepath.Join(homeDir, ".apimgr.json")
+	// Check for new XDG config location first
+	xdgConfigPath := filepath.Join(homeDir, ".config", "apimgr", "config.json")
+	oldConfigPath := filepath.Join(homeDir, ".apimgr.json")
+	
+	configPath := oldConfigPath
+	
+	// Use XDG path if it exists or if old path doesn't exist
+	if _, err := os.Stat(xdgConfigPath); err == nil {
+		configPath = xdgConfigPath
+	} else if _, err := os.Stat(oldConfigPath); os.IsNotExist(err) {
+		// If neither exists, use the new XDG path
+		configPath = xdgConfigPath
+		// Ensure directory exists
+		configDir := filepath.Dir(xdgConfigPath)
+		os.MkdirAll(configDir, 0755)
+	}
 
 	return &ConfigManager{
 		configPath: configPath,

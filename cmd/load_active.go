@@ -8,7 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var LoadActiveCmd = &cobra.Command{
+func init() {
+	rootCmd.AddCommand(loadActiveCmd)
+}
+
+var loadActiveCmd = &cobra.Command{
 	Use:   "load-active",
 	Short: "加载活动配置的环境变量",
 	Long:  "输出活动配置的环境变量export命令。在shell初始化脚本中使用: eval \"$(apimgr load-active)\"",

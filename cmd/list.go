@@ -9,7 +9,11 @@ import (
 	"apimgr/internal/utils"
 )
 
-var ListCmd = &cobra.Command{
+func init() {
+	rootCmd.AddCommand(listCmd)
+}
+
+var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "列出所有API配置",
 	Long:  "列出所有已保存的API配置",

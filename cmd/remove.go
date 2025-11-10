@@ -8,7 +8,11 @@ import (
 	"apimgr/config"
 )
 
-var RemoveCmd = &cobra.Command{
+func init() {
+	rootCmd.AddCommand(removeCmd)
+}
+
+var removeCmd = &cobra.Command{
 	Use:   "remove [alias]",
 	Short: "删除指定的API配置",
 	Long:  "删除指定别名的API配置",

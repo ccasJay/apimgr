@@ -8,7 +8,11 @@ import (
 	"apimgr/config"
 )
 
-var SwitchCmd = &cobra.Command{
+func init() {
+	rootCmd.AddCommand(switchCmd)
+}
+
+var switchCmd = &cobra.Command{
 	Use:   "switch [alias]",
 	Short: "切换到指定的API配置",
 	Long: `切换到指定的API配置，并输出export命令用于环境变量设置

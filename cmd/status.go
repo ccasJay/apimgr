@@ -8,7 +8,11 @@ import (
 	"apimgr/internal/utils"
 )
 
-var StatusCmd = &cobra.Command{
+func init() {
+	rootCmd.AddCommand(statusCmd)
+}
+
+var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "显示当前激活的配置",
 	Long:  "显示当前激活的API配置信息",

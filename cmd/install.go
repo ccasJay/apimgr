@@ -13,7 +13,7 @@ var (
 	forceInstall bool
 )
 
-var InstallCmd = &cobra.Command{
+var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "安装shell初始化脚本",
 	Long:  "在shell配置文件中添加自动加载命令，使新终端自动加载活动配置",
@@ -184,5 +184,6 @@ fi
 }
 
 func init() {
-	InstallCmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "强制重新安装，覆盖现有配置")
+	rootCmd.AddCommand(installCmd)
+	installCmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "强制重新安装，覆盖现有配置")
 }

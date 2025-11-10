@@ -95,7 +95,7 @@ func runInteractiveMode(prefilledAPIKey, prefilledAuthToken, defaultURL, default
 	fmt.Printf("已添加配置: %s\n", alias)
 }
 
-var AddCmd = &cobra.Command{
+var addCmd = &cobra.Command{
 	Use:   "add [alias]",
 	Short: "添加新的API配置",
 	Long: `添加新的API配置
@@ -184,8 +184,9 @@ var AddCmd = &cobra.Command{
 }
 
 func init() {
-	AddCmd.Flags().StringP("url", "u", "", "API基础URL")
-	AddCmd.Flags().StringP("model", "m", "", "模型名称")
-	AddCmd.Flags().String("sk", "", "API密钥 (ANTHROPIC_API_KEY)")
-	AddCmd.Flags().String("ak", "", "认证令牌 (ANTHROPIC_AUTH_TOKEN)")
+	rootCmd.AddCommand(addCmd)
+	addCmd.Flags().StringP("url", "u", "", "API基础URL")
+	addCmd.Flags().StringP("model", "m", "", "模型名称")
+	addCmd.Flags().String("sk", "", "API密钥 (ANTHROPIC_API_KEY)")
+	addCmd.Flags().String("ak", "", "认证令牌 (ANTHROPIC_AUTH_TOKEN)")
 }
