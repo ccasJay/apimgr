@@ -29,33 +29,86 @@ type ConfigManager struct {
 	configPath string
 }
 
-// NewConfigManager creates a new ConfigManager
+// NewConfigManager creates a new ConfigManager with unified config path
 func NewConfigManager() *ConfigManager {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
-	// Check for new XDG config location first
+	// Always use XDG config location (new standard)
 	xdgConfigPath := filepath.Join(homeDir, ".config", "apimgr", "config.json")
 	oldConfigPath := filepath.Join(homeDir, ".apimgr.json")
-	
-	configPath := oldConfigPath
-	
-	// Use XDG path if it exists or if old path doesn't exist
-	if _, err := os.Stat(xdgConfigPath); err == nil {
-		configPath = xdgConfigPath
-	} else if _, err := os.Stat(oldConfigPath); os.IsNotExist(err) {
-		// If neither exists, use the new XDG path
-		configPath = xdgConfigPath
-		// Ensure directory exists
-		configDir := filepath.Dir(xdgConfigPath)
-		os.MkdirAll(configDir, 0755)
+
+	configPath := xdgConfigPath
+
+	// Ensure XDG directory exists
+	configDir := filepath.Dir(xdgConfigPath)
+	os.MkdirAll(configDir, 0755)
+
+	// Migrate from old config if it exists and new config doesn't
+	if shouldMigrateConfig(oldConfigPath, xdgConfigPath) {
+		if err := migrateConfig(oldConfigPath, xdgConfigPath); err != nil {
+			fmt.Printf("⚠️  配置迁移失败: %v\n", err)
+			// Continue with new config path anyway
+		} else {
+			fmt.Println("✅ 从旧配置位置迁移配置成功")
+		}
 	}
 
 	return &ConfigManager{
 		configPath: configPath,
 	}
+}
+
+// shouldMigrateConfig checks if config migration should be performed
+func shouldMigrateConfig(oldPath, newPath string) bool {
+	// Migrate if old config exists and new config doesn't
+	oldExists := fileExists(oldPath)
+	newExists := fileExists(newPath)
+	return oldExists && !newExists
+}
+
+// migrateConfig migrates configuration from old path to new path
+func migrateConfig(oldPath, newPath string) error {
+	data, err := os.ReadFile(oldPath)
+	if err != nil {
+		return fmt.Errorf("读取旧配置文件失败: %v", err)
+	}
+
+	if len(data) == 0 {
+		return fmt.Errorf("旧配置文件为空")
+	}
+
+	// Validate that it's a valid config
+	var tempConfig ConfigFile
+	if err := json.Unmarshal(data, &tempConfig); err != nil {
+		// Try old format (array of configs)
+		var tempConfigs []APIConfig
+		if err2 := json.Unmarshal(data, &tempConfigs); err2 != nil {
+			return fmt.Errorf("旧配置文件格式无效: %v", err)
+		}
+	}
+
+	// Write to new location
+	if err := os.WriteFile(newPath, data, 0600); err != nil {
+		return fmt.Errorf("写入新配置文件失败: %v", err)
+	}
+
+	// Backup old config
+	backupPath := oldPath + ".backup"
+	if err := os.Rename(oldPath, backupPath); err != nil {
+		// Don't fail migration if backup fails
+		fmt.Printf("⚠️  无法创建旧配置备份: %v\n", err)
+	}
+
+	return nil
+}
+
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 // GetConfigPath returns the path to the config file
@@ -274,4 +327,72 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 func isValidURL(u string) bool {
 	_, err := url.ParseRequestURI(u)
 	return err == nil
+}
+
+// UpdatePartial updates only the specified fields of a configuration
+func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) error {
+	configs, err := cm.Load()
+	if err != nil {
+		return err
+	}
+
+	for i, config := range configs {
+		if config.Alias == alias {
+			// Update only the fields that are provided
+			if apiKey, ok := updates["api_key"]; ok {
+				configs[i].APIKey = apiKey
+			}
+			if authToken, ok := updates["auth_token"]; ok {
+				configs[i].AuthToken = authToken
+			}
+			if baseURL, ok := updates["base_url"]; ok {
+				configs[i].BaseURL = baseURL
+			}
+			if model, ok := updates["model"]; ok {
+				configs[i].Model = model
+			}
+
+			// Validate the updated config
+			if err := cm.validateConfig(configs[i]); err != nil {
+				return err
+			}
+
+			return cm.Save(configs)
+		}
+	}
+
+	return fmt.Errorf("配置 '%s' 不存在", alias)
+}
+
+// RenameAlias renames a configuration alias
+func (cm *ConfigManager) RenameAlias(oldAlias, newAlias string) error {
+	configs, err := cm.Load()
+	if err != nil {
+		return err
+	}
+
+	// Check if new alias already exists
+	for _, cfg := range configs {
+		if cfg.Alias == newAlias {
+			return fmt.Errorf("配置 '%s' 已存在", newAlias)
+		}
+	}
+
+	// Find and rename
+	for i, cfg := range configs {
+		if cfg.Alias == oldAlias {
+			configs[i].Alias = newAlias
+
+			// Update active config if needed
+			configFile, err := cm.loadConfigFile()
+			if err == nil && configFile.Active == oldAlias {
+				configFile.Active = newAlias
+				cm.saveConfigFile(configFile)
+			}
+
+			return cm.Save(configs)
+		}
+	}
+
+	return fmt.Errorf("配置 '%s' 不存在", oldAlias)
 }
