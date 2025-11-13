@@ -100,7 +100,15 @@ func editConfig(alias string) error {
 	if err := applyUpdates(configManager, alias, updates); err != nil {
 		return fmt.Errorf("保存失败: %v", err)
 	}
-	fmt.Printf("\n✅ 配置 '%s' 已更新\n", getUpdatedAlias(alias, updates))
+
+	// Generate active.env script
+	updatedAlias := getUpdatedAlias(alias, updates)
+	configManager2 := config.NewConfigManager()
+	if err := configManager2.GenerateActiveScript(); err != nil {
+		fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+	}
+
+	fmt.Printf("\n✅ 配置 '%s' 已更新\n", updatedAlias)
 	return nil
 }
 

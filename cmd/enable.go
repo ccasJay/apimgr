@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"apimgr/internal/shell"
+	"apimgr/config"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ var enableCmd = &cobra.Command{
 - XDG-compliant directory structure
 - Configuration file migration
 - Shell integration
-- Daemon auto-start`,
+- Active environment file generation`,
 	Run: runEnable,
 }
 
@@ -35,7 +35,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 	configDir := filepath.Join(homeDir, ".config", "apimgr")
 	oldConfigPath := filepath.Join(homeDir, ".apimgr.json")
 	newConfigPath := filepath.Join(configDir, "config.json")
-	shellIntegrationPath := filepath.Join(configDir, "shell-integration.sh")
+	activeEnvPath := filepath.Join(configDir, "active.env")
 
 	// Step 1: Create XDG directory structure
 	fmt.Println("📁 Creating XDG-compliant directory structure...")
@@ -77,14 +77,15 @@ func runEnable(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Step 3: Generate and write shell integration script
-	fmt.Println("🔧 Generating shell integration script...")
-	generator := shell.NewGenerator()
-	if err := generator.WriteToFile(shellIntegrationPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to write shell integration: %v\n", err)
-		os.Exit(1)
+	// Step 3: Create initial active.env if config exists
+	fmt.Println("🔧 Setting up configuration...")
+	if _, err := os.Stat(newConfigPath); err == nil {
+		// Load config and generate active.env
+		configManager := config.NewConfigManager()
+		if err := configManager.GenerateActiveScript(); err == nil {
+			fmt.Printf("✅ Configuration ready at %s\n", newConfigPath)
+		}
 	}
-	fmt.Printf("✅ Shell integration script created at %s\n", shellIntegrationPath)
 
 	// Step 4: Check shell configuration
 	fmt.Println("\n📝 Checking shell configuration...")
@@ -94,12 +95,12 @@ func runEnable(cmd *cobra.Command, args []string) {
 		filepath.Join(homeDir, ".bash_profile"),
 	}
 
-	integrationLine := fmt.Sprintf("[[ -f %s ]] && source %s", shellIntegrationPath, shellIntegrationPath)
+	integrationLine := fmt.Sprintf("[[ -f %s ]] && source %s", activeEnvPath, activeEnvPath)
 	shellConfigured := false
 
 	for _, rcFile := range shellRcFiles {
 		if data, err := os.ReadFile(rcFile); err == nil {
-			if strings.Contains(string(data), "apimgr/shell-integration.sh") {
+			if strings.Contains(string(data), "apimgr/active.env") {
 				fmt.Printf("✅ Shell integration already configured in %s\n", rcFile)
 				shellConfigured = true
 				break
@@ -110,7 +111,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 	if !shellConfigured {
 		fmt.Println("\n⚠️  Shell integration not configured. Add this line to your shell config:")
 		fmt.Printf("\n    %s\n\n", integrationLine)
-		
+
 		// Detect current shell
 		shell := os.Getenv("SHELL")
 		if strings.Contains(shell, "zsh") {
@@ -126,8 +127,8 @@ func runEnable(cmd *cobra.Command, args []string) {
 	fmt.Println("\n✨ Setup complete! Next steps:")
 	fmt.Println("1. If not done already, add the shell integration line to your shell config")
 	fmt.Println("2. Restart your terminal or run: source ~/.zshrc (or ~/.bashrc)")
-	fmt.Println("3. The daemon will auto-start when you open a new terminal")
-	fmt.Println("4. Use 'apimgr add' to add API configurations")
-	fmt.Println("5. Use 'apimgr switch' to switch between configurations")
-	fmt.Println("\nTo verify the setup, run: apimgr_debug")
+	fmt.Println("3. Use 'apimgr add' to add API configurations")
+	fmt.Println("4. Use 'apimgr switch' to switch between configurations")
+	fmt.Println("5. Configuration changes automatically apply to new terminal sessions")
+	fmt.Println("\nTo verify the setup, run: apimgr status")
 }

@@ -25,12 +25,17 @@ var switchCmd = &cobra.Command{
 		alias := args[0]
 
 		configManager := config.NewConfigManager()
-		
+
 		// Set the active configuration
 		err := configManager.SetActive(alias)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 			os.Exit(1)
+		}
+
+		// Generate active.env script for auto-loading
+		if err := configManager.GenerateActiveScript(); err != nil {
+			fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
 		}
 
 		// Get the configuration

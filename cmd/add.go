@@ -92,6 +92,11 @@ func runInteractiveMode(prefilledAPIKey, prefilledAuthToken, defaultURL, default
 		os.Exit(1)
 	}
 
+	// Generate active.env script
+	if err := configManager.GenerateActiveScript(); err != nil {
+		fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+	}
+
 	fmt.Printf("已添加配置: %s\n", alias)
 }
 
@@ -177,6 +182,11 @@ var addCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 			os.Exit(1)
+		}
+
+		// Generate active.env script
+		if err := configManager.GenerateActiveScript(); err != nil {
+			fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
 		}
 
 		fmt.Printf("已添加配置: %s\n", alias)

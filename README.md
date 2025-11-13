@@ -1,36 +1,23 @@
 # API Manager (apimgr)
 
-一个用 Go 语言开发的命令行工具，用于管理 Anthropic API 密钥和模型配置的快速切换。采用守护进程架构，实现了**无需重启应用即可自动应用配置**的功能。
+一个用 Go 语言开发的命令行工具，用于管理 Anthropic API 密钥和模型配置的快速切换。
 
-## ✨ 新架构特性
-
-**v2.0 版本采用守护进程架构，配置切换立即生效，无需重启应用！**
-
-- 🚀 **实时生效**: 配置切换后立即应用到所有新进程，无需重启终端或应用
-- 🎯 **守护进程**: 后台守护进程监控配置变化，通过 Unix Socket 提供实时配置
-- 📂 **XDG 规范**: 遵循 XDG Base Directory 规范，配置存储在 `~/.config/apimgr/`
-- 🔄 **自动迁移**: 从旧版本自动迁移配置到新目录结构
-- ⚡ **高性能**: Shell 集成包含智能缓存，减少不必要的查询
-- 🛡️ **容错设计**: 多重降级机制，守护进程异常时自动回退到直接读取配置
-
-## 功能特性
+## ✨ 特性
 
 - 📁 **配置管理**: 使用 JSON 文件存储多组 API 配置
-- ⚡ **快速切换**: 使用 `apimgr switch <alias>` 立即切换配置
+- ⚡ **快速切换**: 使用 `apimgr switch <alias>` 快速切换配置
+- 🔄 **自动应用**: 配置切换后自动生成环境变量脚本
 - 🔄 **持久化**: 配置自动保存，新终端自动加载活动配置
 - 🔒 **安全显示**: API 密钥脱敏显示，保护敏感信息
 - ✅ **输入验证**: URL 格式验证和必填字段检查
 - 🛡️ **错误处理**: 完整的错误处理和用户友好提示
-- 📦 **跨平台**: 支持 macOS 和 Linux（Windows 部分支持）
+- 📦 **跨平台**: 支持 macOS、Linux 和 Windows
 
 ## 安装
 
 ```bash
 # 从源码构建
 go build -o apimgr .
-
-# 或从 GitHub Release 安装（未来支持）
-brew install apimgr
 ```
 
 ## 使用方法
@@ -38,20 +25,20 @@ brew install apimgr
 ### 快速开始
 
 ```bash
-# 1. 初始化新架构（首次使用或从旧版本升级）
+# 1. 初始化配置目录
 apimgr enable
 
 # 2. 按提示添加 shell 集成到 ~/.zshrc 或 ~/.bashrc
 # 将以下行添加到你的 shell 配置文件：
-# source "$HOME/.config/apimgr/shell/integration.sh"
+# [[ -f "$HOME/.config/apimgr/active.env" ]] && source "$HOME/.config/apimgr/active.env"
 
 # 3. 重新加载 shell 配置
 source ~/.zshrc  # 或 source ~/.bashrc
 
 # 4. 添加配置
-apimgr add --alias my-config --key sk-xxxxxxxx --url https://api.anthropic.com --model claude-3
+apimgr add --alias my-config --sk sk-xxxxxxxx --url https://api.anthropic.com --model claude-3
 
-# 5. 切换配置（立即生效！）
+# 5. 切换配置
 apimgr switch my-config
 
 # 6. 列出所有配置
@@ -64,33 +51,41 @@ apimgr status
 ### 基本命令
 
 ```bash
-# 初始化新架构（首次使用必须）
+# 初始化配置目录（首次使用必须）
 apimgr enable
 
 # 添加配置
-apimgr add --alias my-config --key sk-xxxxxxxx --url https://api.anthropic.com --model claude-3
+apimgr add --alias my-config --sk sk-xxxxxxxx --url https://api.anthropic.com --model claude-3
+# 或使用 auth token
+apimgr add --alias my-config --ak <auth-token> --url https://api.anthropic.com --model claude-3
 
 # 列出所有配置（* 表示当前活动配置）
 apimgr list
 
-# 切换配置（新架构下立即生效）
-apimgr switch my-config
+# 切换配置
+apimgr switch <别名>
 
 # 显示当前配置
 apimgr status
 
+# 编辑配置
+apimgr edit <别名> [--sk <new-key>] [--ak <new-token>] [--url <new-url>] [--model <new-model>]
+
 # 删除配置
-apimgr remove my-config
+apimgr remove <别名>
+```
 
-# 守护进程管理
-apimgr daemon start    # 启动守护进程（通常自动启动）
-apimgr daemon stop     # 停止守护进程
-apimgr daemon status   # 查看守护进程状态
-apimgr daemon restart  # 重启守护进程
+### 交互式添加
 
-# 禁用新架构（回退到旧版本行为）
-apimgr disable         # 停止守护进程，保留配置
-apimgr disable --purge # 完全清理，删除所有配置
+```bash
+# 完全交互式模式
+apimgr add
+
+# API 密钥预设交互式
+apimgr add --sk <your-api-key>
+
+# 认证令牌预设交互式
+apimgr add --ak <your-auth-token>
 ```
 
 ### 配置文件
@@ -112,19 +107,9 @@ apimgr disable --purge # 完全清理，删除所有配置
 }
 ```
 
-新架构目录结构：
-```
-~/.config/apimgr/
-├── config.json           # 配置文件
-├── daemon.pid           # 守护进程 PID
-├── daemon.sock          # Unix Socket 文件
-└── shell/
-    └── integration.sh   # Shell 集成脚本
-```
-
 ### 环境变量
 
-切换配置时会输出以下环境变量：
+切换配置时会生成 `active.env` 文件，包含以下环境变量：
 
 - `ANTHROPIC_API_KEY`: API 密钥
 - `ANTHROPIC_AUTH_TOKEN`: 认证令牌（二选一）
@@ -135,58 +120,75 @@ apimgr disable --purge # 完全清理，删除所有配置
 ### 使用示例
 
 ```bash
-# 1. 首次安装（启用新架构）
+# 1. 首次安装
 apimgr enable
 # 输出：
-# ✓ 创建目录 ~/.config/apimgr
-# ✓ 迁移配置文件从 ~/.apimgr.json 到 ~/.config/apimgr/config.json
-# ✓ 生成 shell 集成脚本
-# 
-# 请将以下行添加到你的 ~/.zshrc:
-#   source "$HOME/.config/apimgr/shell/integration.sh"
+# 📁 Creating XDG-compliant directory structure...
+# ✅ Configuration ready at ~/.config/apimgr/config.json
+#
+# 📝 Checking shell configuration...
+# ⚠️  Shell integration not configured. Add this line to your shell config:
+#
+#     [[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env
 
 # 2. 添加 shell 集成并重载
-echo 'source "$HOME/.config/apimgr/shell/integration.sh"' >> ~/.zshrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
 source ~/.zshrc
 
 # 3. 添加开发环境配置
-apimgr add --alias dev --key sk-dev123 --url https://api.anthropic.com --model claude-3-opus
+apimgr add --alias dev --sk sk-dev123 --model claude-3-opus
+# 输出：
+# ✅ Configuration updated - active.env regenerated
+# 已添加配置: dev
 
 # 4. 添加生产环境配置
-apimgr add --alias prod --key sk-prod456 --url https://api.anthropic.com --model claude-3
+apimgr add --alias prod --sk sk-prod456 --model claude-3
+# 输出：
+# ✅ Configuration updated - active.env regenerated
+# 已添加配置: prod
 
 # 5. 查看所有配置
 apimgr list
 # 输出：
-# * dev: API Key: sk-d****123 (URL: https://api.anthropic.com, Model: claude-3-opus)
-#   prod: API Key: sk-p****456 (URL: https://api.anthropic.com, Model: claude-3)
+#   dev: API Key: sk-d****123 (URL: https://api.anthropic.com, Model: claude-3-opus)
+# * prod: API Key: sk-p****456 (URL: https://api.anthropic.com, Model: claude-3)
 
-# 6. 切换到生产环境（立即生效！）
-apimgr switch prod
-# 守护进程自动启动并检测到配置变化
+# 6. 切换到开发环境
+apimgr switch dev
+# 输出：
+# ✅ Configuration updated - active.env regenerated
+# 已切换到配置: dev
 
 # 7. 验证当前配置
 apimgr status
 # 输出：
 # 当前激活的配置:
-#   别名: prod
-#   API Key: sk-p****456
+#   别名: dev
+#   API Key: sk-d****123
 #   Base URL: https://api.anthropic.com
-#   Model: claude-3
+#   Model: claude-3-opus
 
-# 8. 新开终端或运行新进程，自动使用 prod 配置
+# 8. 验证环境变量
 echo $ANTHROPIC_API_KEY
-# 输出: sk-prod456
+# 输出: sk-dev123
 
-# 9. 查看守护进程状态
-apimgr daemon status
-# 输出: 守护进程正在运行 (PID: 12345)
+# 9. 编辑配置
+apimgr edit dev --model claude-3.5-sonnet
+# 输出：
+# ✅ Configuration updated - active.env regenerated
+# 配置已更新: dev
+
+# 10. 删除配置
+apimgr remove test-config
+# 输出：
+# ✅ Configuration updated - active.env regenerated
+# 已删除配置: test-config
 ```
 
 ## 命令详解
 
 ### enable
-启用新的守护进程架构，初始化目录结构并迁移配置
+初始化配置目录和 shell 集成
 
 ```bash
 apimgr enable
@@ -195,24 +197,20 @@ apimgr enable
 功能：
 - 创建 XDG 标准目录结构 (`~/.config/apimgr/`)
 - 从旧版本自动迁移配置文件
-- 生成 shell 集成脚本
+- 生成 `active.env` 文件
 - 提供 shell 配置指导
-
-### disable
-禁用守护进程架构，可选择性清理配置
-
-```bash
-apimgr disable         # 仅停止守护进程
-apimgr disable --purge # 完全删除配置和目录
-```
 
 ### add
 添加新的 API 配置
 
 ```bash
-apimgr add --alias <别名> --key <API密钥> [--url <基础URL>] [--model <模型>]
-# 或使用 auth token
-apimgr add --alias <别名> --ak <认证令牌> --url <基础URL> [--model <模型>]
+# 命令行模式
+apimgr add <alias> [--sk <api-key>] [--ak <auth-token>] [--url <base-url>] [--model <model>]
+
+# 交互式模式
+apimgr add
+apimgr add --sk <api-key>
+apimgr add --ak <auth-token>
 ```
 
 ### list
@@ -223,23 +221,24 @@ apimgr list
 ```
 
 ### switch
-切换到指定配置（新架构下立即生效）
+切换到指定配置
 
 ```bash
 apimgr switch <别名>
 ```
-
-新架构特性：
-- 配置切换立即生效，无需重启应用
-- 守护进程自动检测配置变化
-- 所有新进程自动使用新配置
-- 支持多终端同步
 
 ### status
 显示当前激活的配置信息
 
 ```bash
 apimgr status
+```
+
+### edit
+编辑指定配置
+
+```bash
+apimgr edit <alias> [--sk <new-key>] [--ak <new-token>] [--url <new-url>] [--model <new-model>]
 ```
 
 ### remove
@@ -249,21 +248,22 @@ apimgr status
 apimgr remove <别名>
 ```
 
-### daemon
-管理后台守护进程
+## Shell 集成
+
+### 启用
+
+添加以下行到你的 `~/.zshrc` 或 `~/.bashrc`:
 
 ```bash
-apimgr daemon start    # 启动守护进程
-apimgr daemon stop     # 停止守护进程
-apimgr daemon status   # 查看状态
-apimgr daemon restart  # 重启守护进程
+[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env
 ```
 
-守护进程功能：
-- 监控配置文件变化（使用 fsnotify）
-- 提供 Unix Socket 服务
-- 自动启动（shell 集成检测并启动）
-- 信号处理（SIGTERM, SIGINT, SIGHUP）
+### 工作原理
+
+- `active.env` 文件会在每次配置变更时自动更新
+- 只需要在 shell 配置中添加一行引用
+- 配置切换后，新终端或重新加载的 shell 会自动使用新配置
+- 无需重启终端，只需重新加载 shell 配置或打开新终端
 
 ## 安全特性
 
@@ -287,7 +287,7 @@ go build -o apimgr .
 apimgr enable
 
 # 3. 添加 shell 集成
-echo 'source "$HOME/.config/apimgr/shell/integration.sh"' >> ~/.zshrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
 source ~/.zshrc
 
 # 4. 验证迁移成功
@@ -313,54 +313,26 @@ apimgr enable
 
 ### 主要变化
 - **配置位置**: 从 `~/.apimgr.json` 迁移到 `~/.config/apimgr/config.json`
-- **无需重启**: 配置切换立即生效，不再需要重启应用
-- **守护进程**: 后台运行守护进程监控配置变化
-- **Shell 集成**: 新的集成脚本提供更好的性能和可靠性
+- **配置应用**: 切换配置后自动生成 `active.env` 文件
+- **Shell 集成**: 使用简单的 `source` 命令引用 `active.env`
 
 ## 故障排查
 
-### 守护进程相关问题
+### 配置切换后没有生效
 
-**问题：配置切换后没有生效**
 ```bash
-# 检查守护进程状态
-apimgr daemon status
+# 检查 active.env 文件是否存在
+ls -la ~/.config/apimgr/active.env
 
-# 如果未运行，启动守护进程
-apimgr daemon start
-
-# 重启守护进程
-apimgr daemon restart
-```
-
-**问题：守护进程无法启动**
-```bash
-# 检查是否有残留的 socket 文件
-rm -f ~/.config/apimgr/daemon.sock
-rm -f ~/.config/apimgr/daemon.pid
-
-# 重新启动
-apimgr daemon start
-
-# 查看错误日志
-tail -f /tmp/apimgr-daemon.log  # 如果启用了日志
-```
-
-### Shell 集成问题
-
-**问题：环境变量未设置**
-```bash
 # 确认 shell 集成已添加
 grep apimgr ~/.zshrc  # 或 ~/.bashrc
 
-# 手动添加（如果缺失）
-echo 'source "$HOME/.config/apimgr/shell/integration.sh"' >> ~/.zshrc
-
-# 重新加载 shell
+# 重新加载 shell 配置
 source ~/.zshrc
 ```
 
-**问题：命令未找到**
+### 命令未找到
+
 ```bash
 # 确认 apimgr 在 PATH 中
 which apimgr
@@ -373,7 +345,6 @@ sudo cp apimgr /usr/local/bin/
 
 ### 配置文件问题
 
-**问题：配置文件损坏**
 ```bash
 # 检查配置文件语法
 cat ~/.config/apimgr/config.json | jq .
@@ -385,20 +356,11 @@ echo '{"active":"","configs":[]}' > ~/.config/apimgr/config.json
 
 ### 权限问题
 
-**问题：无法创建或访问配置文件**
 ```bash
 # 修复目录权限
 chmod 755 ~/.config/apimgr
-chmod 644 ~/.config/apimgr/config.json
-chmod 666 ~/.config/apimgr/daemon.sock  # Socket 需要读写权限
+chmod 600 ~/.config/apimgr/config.json
 ```
-
-### 常见错误信息
-
-- **"守护进程未运行"**: 运行 `apimgr daemon start`
-- **"无法连接到 socket"**: 检查守护进程状态，可能需要重启
-- **"配置文件不存在"**: 运行 `apimgr enable` 初始化
-- **"权限被拒绝"**: 检查文件和目录权限
 
 ## 技术架构
 
@@ -406,25 +368,22 @@ chmod 666 ~/.config/apimgr/daemon.sock  # Socket 需要读写权限
 - **CLI 框架**: Cobra
 - **配置格式**: JSON
 - **存储位置**: `~/.config/apimgr/` (XDG 规范)
-- **进程通信**: Unix Socket
-- **文件监控**: fsnotify
-- **架构模式**: 守护进程 + Shell 集成
+- **配置管理**: 直接文件读写 + 活动环境文件生成
 
 ## 开发
 
 ```bash
-# 构建（推荐使用Makefile）
-make install
-
-# 或者手动构建和安装
+# 构建
 go build -o apimgr .
+
+# 安装到系统
 sudo cp apimgr /usr/local/bin/apimgr
 
 # 运行测试
 go test ./...
 
 # 清理
-make clean
+go clean
 ```
 
 ## 许可证

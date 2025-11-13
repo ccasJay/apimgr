@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -395,4 +396,57 @@ func (cm *ConfigManager) RenameAlias(oldAlias, newAlias string) error {
 	}
 
 	return fmt.Errorf("配置 '%s' 不存在", oldAlias)
+}
+
+// GenerateActiveScript 生成活动配置的激活脚本
+func (cm *ConfigManager) GenerateActiveScript() error {
+	active, err := cm.GetActive()
+	if err != nil {
+		// 没有活动配置，清理 active.env 文件
+		activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
+		os.Remove(activeEnvPath)
+		return nil
+	}
+
+	// 生成激活脚本内容
+	envScript := generateEnvScript(active)
+
+	// 写入文件
+	activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
+	return os.WriteFile(activeEnvPath, []byte(envScript), 0644)
+}
+
+// generateEnvScript 生成环境变量脚本内容
+func generateEnvScript(cfg *APIConfig) string {
+	var buf strings.Builder
+
+	// 添加注释
+	buf.WriteString("# 自动生成的活动配置 - 每次配置变更时更新\n")
+	buf.WriteString("# 请不要手动编辑此文件\n\n")
+
+	// 清除旧环境变量
+	buf.WriteString("# 清除之前设置的环境变量\n")
+	buf.WriteString("unset ANTHROPIC_API_KEY\n")
+	buf.WriteString("unset ANTHROPIC_AUTH_TOKEN\n")
+	buf.WriteString("unset ANTHROPIC_BASE_URL\n")
+	buf.WriteString("unset ANTHROPIC_MODEL\n")
+	buf.WriteString("unset APIMGR_ACTIVE\n\n")
+
+	// 设置新环境变量
+	buf.WriteString("# 设置新的环境变量\n")
+	if cfg.APIKey != "" {
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_API_KEY=%q\n", cfg.APIKey))
+	}
+	if cfg.AuthToken != "" {
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_AUTH_TOKEN=%q\n", cfg.AuthToken))
+	}
+	if cfg.BaseURL != "" {
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_BASE_URL=%q\n", cfg.BaseURL))
+	}
+	if cfg.Model != "" {
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_MODEL=%q\n", cfg.Model))
+	}
+	buf.WriteString(fmt.Sprintf("export APIMGR_ACTIVE=%q\n", cfg.Alias))
+
+	return buf.String()
 }
