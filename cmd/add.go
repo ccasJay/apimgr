@@ -7,9 +7,78 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"apimgr/config"
-	"apimgr/internal/utils"
 )
+
+// APIConfigBuilder 负责构建和验证 APIConfig
+type APIConfigBuilder struct {
+	config *config.APIConfig
+}
+
+// NewAPIConfigBuilder 创建新的构建器
+func NewAPIConfigBuilder() *APIConfigBuilder {
+	return &APIConfigBuilder{
+		config: &config.APIConfig{},
+	}
+}
+
+// SetAlias 设置别名
+func (b *APIConfigBuilder) SetAlias(alias string) *APIConfigBuilder {
+	b.config.Alias = alias
+	return b
+}
+
+// SetAPIKey 设置API密钥
+func (b *APIConfigBuilder) SetAPIKey(apiKey string) *APIConfigBuilder {
+	b.config.APIKey = apiKey
+	return b
+}
+
+// SetAuthToken 设置认证令牌
+func (b *APIConfigBuilder) SetAuthToken(authToken string) *APIConfigBuilder {
+	b.config.AuthToken = authToken
+	return b
+}
+
+// SetBaseURL 设置基础URL
+func (b *APIConfigBuilder) SetBaseURL(url string) *APIConfigBuilder {
+	b.config.BaseURL = url
+	return b
+}
+
+// SetModel 设置模型
+func (b *APIConfigBuilder) SetModel(model string) *APIConfigBuilder {
+	b.config.Model = model
+	return b
+}
+
+// Build 构建配置
+func (b *APIConfigBuilder) Build() (*config.APIConfig, error) {
+	if err := b.validate(); err != nil {
+		return nil, err
+	}
+	return b.config, nil
+}
+
+// validate 验证配置
+func (b *APIConfigBuilder) validate() error {
+	if b.config.Alias == "" {
+		return fmt.Errorf("别名不能为空")
+	}
+	if b.config.APIKey == "" && b.config.AuthToken == "" {
+		return fmt.Errorf("API密钥和认证令牌不能同时为空")
+	}
+	if b.config.BaseURL != "" {
+		if _, err := url.ParseRequestURI(b.config.BaseURL); err != nil {
+			return fmt.Errorf("无效的URL格式: %s", b.config.BaseURL)
+		}
+	}
+	return nil
+}
+
+// InputCollector 负责收集用户输入
+type InputCollector struct{}
 
 // isTerminal 检查是否在真正的终端中运行
 func isTerminal() bool {
