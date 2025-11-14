@@ -12,22 +12,93 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// EditFlags represents the command line flags for edit command
+type EditFlags struct {
+	Alias     string
+	APIKey    string
+	AuthToken string
+	BaseURL   string
+	Model     string
+}
+
 func init() {
 	rootCmd.AddCommand(editCmd)
+
+	// Define flags for non-interactive editing
+	editCmd.Flags().String("alias", "", "修改配置别名")
+	editCmd.Flags().String("sk", "", "修改API密钥")
+	editCmd.Flags().String("ak", "", "修改认证令牌")
+	editCmd.Flags().String("url", "", "修改基础URL")
+	editCmd.Flags().String("model", "", "修改模型名称")
 }
 
 var editCmd = &cobra.Command{
 	Use:   "edit <alias>",
-	Short: "交互式编辑配置",
-	Long: `交互式编辑已保存的API配置
+	Short: "编辑配置",
+	Long: `编辑已保存的API配置
 
-此命令将以交互式界面引导您编辑配置的各个字段`,
+默认情况下，此命令将以交互式界面引导您编辑配置的各个字段。
+如果提供了命令行参数，则会直接应用更改，而不进入交互模式。
+
+示例：
+  # 交互式编辑
+  apimgr edit myconfig
+
+  # 非交互式编辑（修改API密钥）
+  apimgr edit myconfig --sk sk-ant-api03-xxx
+
+  # 非交互式编辑多个字段
+  apimgr edit myconfig --url https://api.anthropic.com --model claude-3-opus-20240229`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		alias := args[0]
-		if err := editConfig(alias); err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
+
+		// Check if any flags are provided for non-interactive editing
+		aliasFlag, _ := cmd.Flags().GetString("alias")
+		skFlag, _ := cmd.Flags().GetString("sk")
+		akFlag, _ := cmd.Flags().GetString("ak")
+		urlFlag, _ := cmd.Flags().GetString("url")
+		modelFlag, _ := cmd.Flags().GetString("model")
+
+		// Parse flags into updates map
+		updates := make(map[string]string)
+		if aliasFlag != "" {
+			updates["alias"] = aliasFlag
+		}
+		if skFlag != "" {
+			updates["api_key"] = skFlag
+		}
+		if akFlag != "" {
+			updates["auth_token"] = akFlag
+		}
+		if urlFlag != "" {
+			updates["base_url"] = urlFlag
+		}
+		if modelFlag != "" {
+			updates["model"] = modelFlag
+		}
+
+		configManager := config.NewConfigManager()
+
+		if len(updates) > 0 {
+			// Non-interactive mode: directly apply changes
+			if err := saveAndApplyChanges(configManager, alias, updates); err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Show success message with updated alias
+			updatedAlias := alias
+			if newAlias, ok := updates["alias"]; ok {
+				updatedAlias = newAlias
+			}
+			fmt.Printf("✅ 配置 '%s' 已更新\n", updatedAlias)
+		} else {
+			// Interactive mode: guide user through editing
+			if err := editConfig(alias); err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	},
 }
@@ -55,7 +126,24 @@ func editConfig(alias string) error {
 	// Display current configuration
 	displayConfig(*currentConfig)
 
-	// Interactive editing loop
+	// Collect user edits interactively
+	updates, err := collectUserEdits(currentConfig, configManager)
+	if err != nil {
+		return err
+	}
+
+	// Apply and save changes
+	if err := saveAndApplyChanges(configManager, alias, updates); err != nil {
+		return err
+	}
+
+	updatedAlias := getUpdatedAlias(alias, updates)
+	fmt.Printf("\n✅ 配置 '%s' 已更新\n", updatedAlias)
+	return nil
+}
+
+// collectUserEdits handles the interactive editing loop and returns collected updates
+func collectUserEdits(currentConfig *config.APIConfig, configManager *config.ConfigManager) (map[string]string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	updates := make(map[string]string)
 
@@ -63,29 +151,27 @@ func editConfig(alias string) error {
 		showMenu(len(updates))
 		choice := getUserChoice(reader)
 
-		// Handle special cases
-		if choice == "q" || choice == "Q" {
+		// Handle special cases: quit, preview, or save
+		if shouldQuit(choice) {
 			fmt.Println("\n已取消编辑，未保存更改")
-			return nil
+			return nil, fmt.Errorf("操作已取消")
 		}
 
-		if choice == "p" || choice == "P" {
-			if len(updates) == 0 {
-				fmt.Println("\n⚠️  还没有任何更改")
-				continue
+		if shouldPreview(choice) {
+			if err := handlePreview(currentConfig, updates); err != nil {
+				fmt.Printf("\n❌ %v\n", err)
 			}
-			previewChanges(*currentConfig, updates)
 			continue
 		}
 
-		if choice == "0" {
+		if shouldSave(choice) {
 			if len(updates) == 0 {
 				fmt.Println("\n没有更改，跳过保存")
-				return nil
+				return nil, fmt.Errorf("没有更改")
 			}
 			if !confirmSave(reader) {
 				fmt.Println("\n已取消保存")
-				return nil
+				return nil, fmt.Errorf("保存已取消")
 			}
 			break
 		}
@@ -96,20 +182,22 @@ func editConfig(alias string) error {
 		}
 	}
 
-	// Save changes
-	if err := applyUpdates(configManager, alias, updates); err != nil {
-		return fmt.Errorf("保存失败: %v", err)
-	}
+	return updates, nil
+}
 
-	// Generate active.env script
-	updatedAlias := getUpdatedAlias(alias, updates)
-	configManager2 := config.NewConfigManager()
-	if err := configManager2.GenerateActiveScript(); err != nil {
-		fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
-	}
+// shouldQuit checks if user wants to quit without saving
+func shouldQuit(choice string) bool {
+	return choice == "q" || choice == "Q"
+}
 
-	fmt.Printf("\n✅ 配置 '%s' 已更新\n", updatedAlias)
-	return nil
+// shouldPreview checks if user wants to preview changes
+func shouldPreview(choice string) bool {
+	return choice == "p" || choice == "P"
+}
+
+// shouldSave checks if user wants to save changes
+func shouldSave(choice string) bool {
+	return choice == "0"
 }
 
 func showMenu(updateCount int) {
@@ -170,27 +258,45 @@ func handleFieldSelection(reader *bufio.Reader, currentConfig *config.APIConfig,
 	var fieldType FieldType
 	var fieldName string
 
-	switch choice {
-	case "1":
-		fieldType = FieldAlias
-		fieldName = "别名"
-	case "2":
-		fieldType = FieldAPIKey
-		fieldName = "API密钥"
-	case "3":
-		fieldType = FieldAuthToken
-		fieldName = "认证令牌"
-	case "4":
-		fieldType = FieldBaseURL
-		fieldName = "基础URL"
-	case "5":
-		fieldType = FieldModel
-		fieldName = "模型名称"
-	default:
-		return fmt.Errorf("无效选择，请输入 0-5、p 或 q")
+	// Validate choice and get field info
+	if err := parseFieldChoice(choice, &fieldType, &fieldName); err != nil {
+		return err
 	}
 
 	return editField(reader, currentConfig, updates, fieldType, fieldName, configManager)
+}
+
+// parseFieldChoice parses user choice and returns field information
+func parseFieldChoice(choice string, fieldType *FieldType, fieldName *string) error {
+	switch choice {
+	case "1":
+		*fieldType = FieldAlias
+		*fieldName = "别名"
+	case "2":
+		*fieldType = FieldAPIKey
+		*fieldName = "API密钥"
+	case "3":
+		*fieldType = FieldAuthToken
+		*fieldName = "认证令牌"
+	case "4":
+		*fieldType = FieldBaseURL
+		*fieldName = "基础URL"
+	case "5":
+		*fieldType = FieldModel
+		*fieldName = "模型名称"
+	default:
+		return fmt.Errorf("无效选择，请输入 0-5、p 或 q")
+	}
+	return nil
+}
+
+// handlePreview displays preview of changes if any
+func handlePreview(currentConfig *config.APIConfig, updates map[string]string) error {
+	if len(updates) == 0 {
+		return fmt.Errorf("还没有任何更改")
+	}
+	previewChanges(*currentConfig, updates)
+	return nil
 }
 
 func editField(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, fieldType FieldType, fieldName string, configManager *config.ConfigManager) error {
@@ -342,6 +448,24 @@ func getUpdatedAlias(originalAlias string, updates map[string]string) string {
 		return newAlias
 	}
 	return originalAlias
+}
+
+// saveAndApplyChanges applies updates to config and regenerates the active script
+func saveAndApplyChanges(configManager *config.ConfigManager, alias string, updates map[string]string) error {
+	// Apply field updates
+	if err := applyUpdates(configManager, alias, updates); err != nil {
+		return fmt.Errorf("保存失败: %v", err)
+	}
+
+	// Generate active.env script
+	updatedAlias := getUpdatedAlias(alias, updates)
+	if err := configManager.GenerateActiveScript(); err != nil {
+		fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+	}
+
+	// Note: Active script regeneration is best-effort and doesn't fail the command
+	_ = updatedAlias
+	return nil
 }
 
 func applyUpdates(configManager *config.ConfigManager, alias string, updates map[string]string) error {
