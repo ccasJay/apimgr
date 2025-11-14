@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
 	"apimgr/internal/utils"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -42,17 +42,17 @@ var listCmd = &cobra.Command{
 			} else {
 				authInfo = "Auth Token: " + utils.MaskAPIKey(config.AuthToken)
 			}
-			
+
 			// Mark active configuration with *
 			activeMarker := " "
 			if config.Alias == activeName {
 				activeMarker = "*"
 			}
-			
+
 			fmt.Printf("%s %s: %s (URL: %s, Model: %s)\n",
 				activeMarker, config.Alias, authInfo, config.BaseURL, config.Model)
 		}
-		
+
 		if activeName != "" {
 			fmt.Printf("\n* 表示当前活动配置\n")
 		}

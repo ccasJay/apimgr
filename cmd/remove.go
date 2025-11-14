@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
+	"github.com/spf13/cobra"
 )
 
 func init() {

@@ -27,7 +27,7 @@ var installCmd = &cobra.Command{
 		// Detect shell
 		shell := os.Getenv("SHELL")
 		var rcFile string
-		
+
 		if strings.Contains(shell, "zsh") {
 			rcFile = filepath.Join(homeDir, ".zshrc")
 		} else if strings.Contains(shell, "bash") {
@@ -73,7 +73,7 @@ fi
 					fmt.Fprintf(os.Stderr, "错误: 无法读取 %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
-				
+
 				// Check for new version (with apimgr() function wrapper)
 				if strings.Contains(string(content), "apimgr load-active") {
 					if strings.Contains(string(content), "apimgr() {") {
@@ -96,21 +96,21 @@ fi
 					fmt.Fprintf(os.Stderr, "错误: 无法读取 %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
-				
+
 				// Remove old apimgr configuration
 				lines := strings.Split(string(content), "\n")
 				var newLines []string
 				inApimgrBlock := false
-				
+
 				for _, line := range lines {
 					trimmed := strings.TrimSpace(line)
-					
+
 					// Start of apimgr block
 					if strings.Contains(trimmed, "# apimgr") {
 						inApimgrBlock = true
 						continue
 					}
-					
+
 					// Inside block
 					if inApimgrBlock {
 						// End of block (empty line or new section)
@@ -119,23 +119,23 @@ fi
 								inApimgrBlock = false
 							}
 						}
-						
+
 						// Skip lines in block
 						if inApimgrBlock && (strings.Contains(line, "apimgr") || strings.Contains(line, "eval") || strings.Contains(line, "if command") || strings.Contains(line, "fi") || strings.Contains(line, "{") || strings.Contains(line, "}")) {
 							continue
 						}
 					}
-					
+
 					newLines = append(newLines, line)
 				}
-				
+
 				// Write back the cleaned content
 				err = os.WriteFile(rcFile, []byte(strings.Join(newLines, "\n")), 0644)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "错误: 无法更新 %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
-				
+
 				fmt.Printf("✓ 已清除旧配置\n")
 			}
 		}
@@ -154,7 +154,7 @@ fi
 			fmt.Fprintf(os.Stderr, "错误: 无法写入 %s: %v\n", rcFile, err)
 			os.Exit(1)
 		}
-		
+
 		// Close file explicitly to ensure content is flushed to disk
 		err = f.Close()
 		if err != nil {
@@ -170,7 +170,7 @@ fi
 		fmt.Printf("  apimgr switch <配置别名>  # 自动切换并应用环境变量\n")
 		fmt.Printf("  apimgr list               # 列出所有配置\n")
 		fmt.Printf("  apimgr status             # 查看当前配置状态\n")
-		
+
 		// Verify that the file was actually modified by checking if the script exists in the file
 		updatedContent, err := os.ReadFile(rcFile)
 		if err != nil {

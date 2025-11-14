@@ -48,18 +48,18 @@ func runEnable(cmd *cobra.Command, args []string) {
 	if _, err := os.Stat(oldConfigPath); err == nil {
 		if _, err := os.Stat(newConfigPath); os.IsNotExist(err) {
 			fmt.Printf("📦 Migrating configuration from %s to %s...\n", oldConfigPath, newConfigPath)
-			
+
 			data, err := os.ReadFile(oldConfigPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed to read old config: %v\n", err)
 				os.Exit(1)
 			}
-			
+
 			if err := os.WriteFile(newConfigPath, data, 0644); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed to write new config: %v\n", err)
 				os.Exit(1)
 			}
-			
+
 			fmt.Println("✅ Configuration migrated successfully")
 			fmt.Printf("   You can safely remove the old config file: rm %s\n", oldConfigPath)
 		} else {

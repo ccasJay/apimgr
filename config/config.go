@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -91,9 +92,38 @@ func migrateConfig(oldPath, newPath string) error {
 		}
 	}
 
-	// Write to new location
-	if err := os.WriteFile(newPath, data, 0600); err != nil {
+	// Write to new location with locking
+	file, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("打开新配置文件失败: %v", err)
+	}
+
+	// Lock the new config file exclusively
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		file.Close()
+		return fmt.Errorf("锁定新配置文件失败: %v", err)
+	}
+
+	// Write data while holding the lock
+	_, err = file.Write(data)
+	if err != nil {
+		file.Close()
 		return fmt.Errorf("写入新配置文件失败: %v", err)
+	}
+
+	// Ensure data is flushed
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return fmt.Errorf("同步新配置文件失败: %v", err)
+	}
+
+	// Unlock and close
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN); err != nil {
+		file.Close()
+		return fmt.Errorf("解锁新配置文件失败: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("关闭新配置文件失败: %v", err)
 	}
 
 	// Backup old config
@@ -119,11 +149,24 @@ func (cm *ConfigManager) GetConfigPath() string {
 
 // loadConfigFile loads the config file with locking
 func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
-	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
-		return &ConfigFile{Configs: []APIConfig{}}, nil
+	// Open the file with read lock
+	file, err := os.OpenFile(cm.configPath, os.O_RDONLY, 0600)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &ConfigFile{Configs: []APIConfig{}}, nil
+		}
+		return nil, fmt.Errorf("打开配置文件失败: %v", err)
 	}
+	defer file.Close()
 
-	data, err := os.ReadFile(cm.configPath)
+	// Lock the file for shared read access (LOCK_SH)
+	if err := cm.lockFileShared(file); err != nil {
+		return nil, fmt.Errorf("锁定配置文件失败: %v", err)
+	}
+	defer cm.unlockFile(file)
+
+	// Read from the locked file descriptor instead of using os.ReadFile
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, fmt.Errorf("读取配置文件失败: %v", err)
 	}
@@ -153,17 +196,41 @@ func (cm *ConfigManager) saveConfigFile(configFile *ConfigFile) error {
 		return fmt.Errorf("序列化配置失败: %v", err)
 	}
 
-	err = os.WriteFile(cm.configPath, data, 0600)
+	// Open the file with write access (create if not exists)
+	file, err := os.OpenFile(cm.configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("保存配置文件失败: %v", err)
+		return fmt.Errorf("打开配置文件失败: %v", err)
+	}
+	defer file.Close()
+
+	// Lock the file for exclusive write access
+	if err := cm.lockFile(file); err != nil {
+		return fmt.Errorf("锁定配置文件失败: %v", err)
+	}
+	defer cm.unlockFile(file)
+
+	// Write the file while holding the lock
+	_, err = file.Write(data)
+	if err != nil {
+		return fmt.Errorf("写入配置文件失败: %v", err)
+	}
+
+	// Ensure data is flushed to disk
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("同步配置文件失败: %v", err)
 	}
 
 	return nil
 }
 
-// lockFile locks the config file
+// lockFile locks the config file with exclusive lock (for write operations)
 func (cm *ConfigManager) lockFile(file *os.File) error {
 	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX)
+}
+
+// lockFileShared locks the config file with shared lock (for read operations)
+func (cm *ConfigManager) lockFileShared(file *os.File) error {
+	return syscall.Flock(int(file.Fd()), syscall.LOCK_SH)
 }
 
 // unlockFile unlocks the config file
@@ -413,7 +480,21 @@ func (cm *ConfigManager) GenerateActiveScript() error {
 
 	// 写入文件
 	activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
-	return os.WriteFile(activeEnvPath, []byte(envScript), 0644)
+	if err := os.WriteFile(activeEnvPath, []byte(envScript), 0644); err != nil {
+		return err
+	}
+
+	// 同步到全局 Claude Code 设置（可选功能，不影响主流程）
+	if syncErr := cm.syncClaudeSettings(active); syncErr != nil {
+		fmt.Printf("⚠️  同步全局 Claude Code 设置失败: %v\n", syncErr)
+	}
+
+	// 同步到项目级配置文件（如果存在 .claude 目录）
+	if syncErr := cm.syncProjectClaudeConfig(active); syncErr != nil {
+		// 项目级同步失败不报错，因为不是所有项目都有 .claude 目录
+	}
+
+	return nil
 }
 
 // generateEnvScript 生成环境变量脚本内容
@@ -449,4 +530,133 @@ func generateEnvScript(cfg *APIConfig) string {
 	buf.WriteString(fmt.Sprintf("export APIMGR_ACTIVE=%q\n", cfg.Alias))
 
 	return buf.String()
+}
+
+// syncClaudeSettings 同步配置到全局 Claude Code 设置文件
+func (cm *ConfigManager) syncClaudeSettings(cfg *APIConfig) error {
+	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
+
+	// 检查 Claude Code 配置文件是否存在
+	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
+		// 文件不存在，跳过同步
+		return nil
+	}
+
+	// 读取现有设置
+	data, err := os.ReadFile(claudeSettingsPath)
+	if err != nil {
+		return fmt.Errorf("读取全局 Claude Code 设置失败: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return fmt.Errorf("解析全局 Claude Code 设置失败: %v", err)
+	}
+
+	// 确保 env 字段存在
+	if settings["env"] == nil {
+		settings["env"] = make(map[string]interface{})
+	}
+
+	env := settings["env"].(map[string]interface{})
+
+	// 更新环境变量
+	// 清除旧的 ANTHROPIC 相关变量
+	delete(env, "ANTHROPIC_API_KEY")
+	delete(env, "ANTHROPIC_AUTH_TOKEN")
+	delete(env, "ANTHROPIC_BASE_URL")
+
+	// 设置新的环境变量
+	if cfg.APIKey != "" {
+		env["ANTHROPIC_API_KEY"] = cfg.APIKey
+	}
+	if cfg.AuthToken != "" {
+		env["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
+	}
+	if cfg.BaseURL != "" {
+		env["ANTHROPIC_BASE_URL"] = cfg.BaseURL
+	}
+	if cfg.Model != "" {
+		env["ANTHROPIC_MODEL"] = cfg.Model
+	}
+
+	// 写回文件
+	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化全局 Claude Code 设置失败: %v", err)
+	}
+
+	if err := os.WriteFile(claudeSettingsPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("写入全局 Claude Code 设置失败: %v", err)
+	}
+
+	return nil
+}
+
+// syncProjectClaudeConfig 同步配置到项目级 .claude/settings.json
+func (cm *ConfigManager) syncProjectClaudeConfig(cfg *APIConfig) error {
+	// 获取当前工作目录
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// 项目级配置文件路径
+	projectClaudePath := filepath.Join(workDir, ".claude", "settings.json")
+
+	// 检查项目是否有 .claude 目录
+	if _, err := os.Stat(projectClaudePath); os.IsNotExist(err) {
+		// 没有项目级配置，跳过
+		return nil
+	}
+
+	// 读取项目级配置
+	data, err := os.ReadFile(projectClaudePath)
+	if err != nil {
+		return fmt.Errorf("读取项目级 Claude Code 设置失败: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return fmt.Errorf("解析项目级 Claude Code 设置失败: %v", err)
+	}
+
+	// 更新 env 字段
+	if settings["env"] == nil {
+		settings["env"] = make(map[string]interface{})
+	}
+
+	env := settings["env"].(map[string]interface{})
+
+	// 清除旧的 ANTHROPIC 相关变量
+	delete(env, "ANTHROPIC_API_KEY")
+	delete(env, "ANTHROPIC_AUTH_TOKEN")
+	delete(env, "ANTHROPIC_BASE_URL")
+
+	// 设置新的环境变量
+	if cfg.APIKey != "" {
+		env["ANTHROPIC_API_KEY"] = cfg.APIKey
+	}
+	if cfg.AuthToken != "" {
+		env["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
+	}
+	if cfg.BaseURL != "" {
+		env["ANTHROPIC_BASE_URL"] = cfg.BaseURL
+	}
+	if cfg.Model != "" {
+		env["ANTHROPIC_MODEL"] = cfg.Model
+	}
+
+	// 写回文件
+	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化项目级 Claude Code 设置失败: %v", err)
+	}
+
+	if err := os.WriteFile(projectClaudePath, updatedData, 0644); err != nil {
+		return fmt.Errorf("写入项目级 Claude Code 设置失败: %v", err)
+	}
+
+	fmt.Printf("✅ 项目级 Claude Code 配置已更新: %s\n", projectClaudePath)
+	return nil
 }

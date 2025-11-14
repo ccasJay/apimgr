@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
 	"apimgr/internal/utils"
+	"github.com/spf13/cobra"
 )
 
 // isTerminal 检查是否在真正的终端中运行

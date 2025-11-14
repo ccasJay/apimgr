@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -37,6 +38,9 @@ var switchCmd = &cobra.Command{
 		if err := configManager.GenerateActiveScript(); err != nil {
 			fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
 		}
+
+		// 显示同步信息
+		showSyncInfo(alias)
 
 		// Get the configuration
 		apiConfig, err := configManager.Get(alias)
@@ -70,4 +74,32 @@ var switchCmd = &cobra.Command{
 		// Print success message to stderr so it doesn't interfere with eval
 		fmt.Fprintf(os.Stderr, "✓ 已切换到配置: %s\n", alias)
 	},
+}
+
+// showSyncInfo 显示同步状态信息
+func showSyncInfo(alias string) {
+	// 检查同步状态
+	globalClaudePath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
+	projectClaudePath := filepath.Join(".", ".claude", "settings.json")
+
+	hasGlobal := false
+	hasProject := false
+
+	if _, err := os.Stat(globalClaudePath); err == nil {
+		hasGlobal = true
+	}
+	if _, err := os.Stat(projectClaudePath); err == nil {
+		hasProject = true
+	}
+
+	if hasGlobal || hasProject {
+		fmt.Fprintf(os.Stderr, "\n✅ 配置同步状态:\n")
+		if hasGlobal {
+			fmt.Fprintf(os.Stderr, "   • 全局 Claude Code: ~/.claude/settings.json\n")
+		}
+		if hasProject {
+			fmt.Fprintf(os.Stderr, "   • 项目级 Claude Code: %s\n", projectClaudePath)
+		}
+		fmt.Fprintf(os.Stderr, "\n💡 配置已自动同步到 Claude Code，可以直接使用。\n")
+	}
 }

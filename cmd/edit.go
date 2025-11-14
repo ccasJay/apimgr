@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
 	"apimgr/internal/utils"
+	"github.com/spf13/cobra"
 )
 
 func init() {
