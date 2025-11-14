@@ -1,0 +1,34 @@
+# 编译后的可执行文件
+apimgr
+
+# 其他常见的忽略项
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go 相关
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE 目录
+.vscode/
+.idea/
+
+# OS 目录
+.DS_Store
+Thumbs.db

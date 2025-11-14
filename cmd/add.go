@@ -3,12 +3,12 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
 	"apimgr/config"
 	"apimgr/internal/utils"
-	"github.com/spf13/cobra"
 )
 
 // isTerminal 检查是否在真正的终端中运行
@@ -20,37 +20,29 @@ func isTerminal() bool {
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
-// runInteractiveMode 处理交互式输入
-func runInteractiveMode(prefilledAPIKey, prefilledAuthToken, defaultURL, defaultModel, presetAuthType string) {
+// CollectInteractively 交互式收集输入
+func (ic *InputCollector) CollectInteractively(presetType string) (*config.APIConfig, error) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("请输入配置别名: ")
 	alias, _ := reader.ReadString('\n')
 	alias = strings.TrimSpace(alias)
-	if alias == "" {
-		fmt.Println("错误: 别名不能为空")
-		os.Exit(1)
-	}
 
 	var apiKey, authToken, url, model string
 
 	// 根据预设类型处理
-	if presetAuthType == "api_key" {
-		// 预设为API密钥模式
-		apiKey = prefilledAPIKey
-		fmt.Printf("已设置API密钥: %s\n", utils.MaskAPIKey(apiKey))
+	if presetType == "api_key" {
+		// API密钥已通过命令行提供
 		fmt.Print("请输入认证令牌 (可选): ")
 		authToken, _ = reader.ReadString('\n')
 		authToken = strings.TrimSpace(authToken)
-	} else if presetAuthType == "auth_token" {
-		// 预设为认证令牌模式
-		authToken = prefilledAuthToken
-		fmt.Printf("已设置认证令牌: %s\n", utils.MaskAPIKey(authToken))
+	} else if presetType == "auth_token" {
+		// 认证令牌已通过命令行提供
 		fmt.Print("请输入API密钥 (可选): ")
 		apiKey, _ = reader.ReadString('\n')
 		apiKey = strings.TrimSpace(apiKey)
 	} else {
-		// 完全交互式选择
+		// 完全交互式
 		fmt.Print("请输入API密钥 (可选，与auth token二选一): ")
 		apiKey, _ = reader.ReadString('\n')
 		apiKey = strings.TrimSpace(apiKey)
@@ -62,8 +54,7 @@ func runInteractiveMode(prefilledAPIKey, prefilledAuthToken, defaultURL, default
 
 	// 验证至少有一种认证方式
 	if apiKey == "" && authToken == "" {
-		fmt.Println("错误: 必须提供API密钥或认证令牌")
-		os.Exit(1)
+		return nil, fmt.Errorf("必须提供API密钥或认证令牌")
 	}
 
 	fmt.Print("请输入API基础URL (可选，默认 https://api.anthropic.com): ")
@@ -77,119 +68,132 @@ func runInteractiveMode(prefilledAPIKey, prefilledAuthToken, defaultURL, default
 	model, _ = reader.ReadString('\n')
 	model = strings.TrimSpace(model)
 
-	apiConfig := config.APIConfig{
-		Alias:     alias,
-		APIKey:    apiKey,
-		AuthToken: authToken,
-		BaseURL:   url,
-		Model:     model,
-	}
+	// 使用构建器创建配置
+	builder := NewAPIConfigBuilder().
+		SetAlias(alias).
+		SetAPIKey(apiKey).
+		SetAuthToken(authToken).
+		SetBaseURL(url).
+		SetModel(model)
 
-	configManager := config.NewConfigManager()
-	err := configManager.Add(apiConfig)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Generate active.env script
-	if err := configManager.GenerateActiveScript(); err != nil {
-		fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
-	}
-
-	fmt.Printf("已添加配置: %s\n", alias)
+	return builder.Build()
 }
 
 var addCmd = &cobra.Command{
 	Use:   "add [alias]",
 	Short: "添加新的API配置",
-	Long: `添加新的API配置
+	Long: `添加新的API配置 - 支持多种模式：
 
-用法1: 完全交互式
-  apimgr add
+1. 完全交互式:
+   apimgr add
 
-用法2: API密钥预设交互式
-  apimgr add --sk
+2. 命令行快速添加:
+   apimgr add my-config --sk sk-xxx --url https://api.anthropic.com --model claude-3
+   apimgr add my-config --ak bearer-token -u https://api.anthropic.com -m claude-3
 
-用法3: 认证令牌预设交互式
-  apimgr add --ak
-
-用法4: 命令行参数
-  apimgr add my-config --sk sk-xxx --url https://api.example.com --model claude-3
-
-用法5: 命令行参数
-  apimgr add my-config --ak bearer-token --url https://api.example.com --model claude-3`,
+3. 预设模式 (有预设但缺少别名):
+   apimgr add --sk sk-xxx -u https://api.anthropic.com -m claude-3
+   apimgr add --ak bearer-token`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var alias, apiKey, authToken, url, model string
+		configManager := config.NewConfigManager()
+		collector := &InputCollector{}
 
-		// 从命令行标志获取参数
-		apiKeyFlag := cmd.Flags().Lookup("sk").Changed
-		authTokenFlag := cmd.Flags().Lookup("ak").Changed
-		apiKey, _ = cmd.Flags().GetString("sk")
-		authToken, _ = cmd.Flags().GetString("ak")
-		url, _ = cmd.Flags().GetString("url")
-		model, _ = cmd.Flags().GetString("model")
+		// 决定输入模式
+		var cfg *config.APIConfig
+		var err error
 
-		// 如果使用了 --sk 或 --ak 标志且没有别名，进入交互式模式
-		if (apiKeyFlag || authTokenFlag) && len(args) == 0 {
+		hasSK := cmd.Flags().Lookup("sk").Changed
+		hasAK := cmd.Flags().Lookup("ak").Changed
+		hasAlias := len(args) == 1
+
+		switch {
+		case hasSK || hasAK:
+			// 预设模式 - 有预设参数但没有别名，进入交互式
+			presetType := ""
+			if hasSK {
+				presetType = "api_key"
+			} else {
+				presetType = "auth_token"
+			}
+
 			if !isTerminal() {
-				fmt.Println("当前环境不支持交互式输入，请提供别名:")
-				fmt.Println("apimgr add <alias> (--sk <api-key> | --ak <auth-token>) [--url <url>] [--model <model>]")
+				fmt.Println("❌ 当前环境不支持交互式输入，请提供别名:")
+				fmt.Printf("  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]\n",
+					map[bool]string{true: "sk", false: "ak"}[hasSK])
 				os.Exit(1)
 			}
-			// 根据标志决定预设的认证类型
-			if apiKeyFlag {
-				runInteractiveMode(apiKey, "", url, model, "api_key")
-			} else {
-				runInteractiveMode("", authToken, url, model, "auth_token")
-			}
-			return
-		}
 
-		if len(args) == 1 {
-			// 命令行模式
-			alias = args[0]
+			cfg, err = collector.CollectInteractively(presetType)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				os.Exit(1)
+			}
+
+		case hasAlias:
+			// 命令行模式 - 有别名和参数
+			alias := args[0]
+			apiKey, _ := cmd.Flags().GetString("sk")
+			authToken, _ := cmd.Flags().GetString("ak")
+			url, _ := cmd.Flags().GetString("url")
+			model, _ := cmd.Flags().GetString("model")
+
+			// 设置默认值
 			if url == "" {
 				url = "https://api.anthropic.com"
 			}
+
 			// 验证至少有一种认证方式
 			if apiKey == "" && authToken == "" {
-				fmt.Println("错误: 必须提供 --sk 或 --ak 参数")
+				fmt.Println("❌ 错误: 必须提供 --sk 或 --ak 参数")
+				fmt.Println("\n💡 用法示例:")
+				fmt.Println("  apimgr add my-config --sk sk-xxx")
+				fmt.Println("  apimgr add my-config --ak token-xxx")
 				os.Exit(1)
 			}
-		} else {
+
+			builder := NewAPIConfigBuilder().
+				SetAlias(alias).
+				SetAPIKey(apiKey).
+				SetAuthToken(authToken).
+				SetBaseURL(url).
+				SetModel(model)
+
+			cfg, err = builder.Build()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "❌ 错误: %v\n", err)
+				os.Exit(1)
+			}
+
+		default:
 			// 完全交互式模式
 			if !isTerminal() {
-				fmt.Println("当前环境不支持交互式输入，请提供别名:")
-				fmt.Println("apimgr add <alias> (--sk <api-key> | --ak <auth-token>) [--url <url>] [--model <model>]")
+				fmt.Println("❌ 当前环境不支持交互式输入")
+				fmt.Printf("  apimgr add <alias> --sk <key> [--url <url>] [--model <model>]\n")
 				os.Exit(1)
 			}
-			runInteractiveMode("", "", url, model, "none")
-			return
+
+			cfg, err = collector.CollectInteractively("")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				os.Exit(1)
+			}
 		}
 
-		apiConfig := config.APIConfig{
-			Alias:     alias,
-			APIKey:    apiKey,
-			AuthToken: authToken,
-			BaseURL:   url,
-			Model:     model,
-		}
-
-		configManager := config.NewConfigManager()
-		err := configManager.Add(apiConfig)
+		// 保存配置
+		err = configManager.Add(*cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ 保存配置失败: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Generate active.env script
+		// 生成激活脚本
 		if err := configManager.GenerateActiveScript(); err != nil {
-			fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "⚠️  警告: 生成激活脚本失败: %v\n", err)
 		}
 
-		fmt.Printf("已添加配置: %s\n", alias)
+		fmt.Printf("✅ 已添加配置: %s\n", cfg.Alias)
+		fmt.Println("\n💡 提示: 运行 'apimgr switch <alias>' 切换到此配置")
 	},
 }
 
