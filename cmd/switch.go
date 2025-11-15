@@ -11,6 +11,8 @@ import (
 
 func init() {
 	rootCmd.AddCommand(switchCmd)
+	// 添加本地切换参数
+	switchCmd.Flags().BoolP("local", "l", false, "仅在当前shell生效，不修改全局配置")
 }
 
 var switchCmd = &cobra.Command{
@@ -20,29 +22,39 @@ var switchCmd = &cobra.Command{
 
 要使环境变量在当前shell中生效，有以下两种方式：
 1. 使用 eval: eval "$(apimgr switch <alias>)"
-2. 安装shell集成: apimgr install （推荐，安装后可直接使用 apimgr switch）`,
+2. 安装shell集成: apimgr install （推荐，安装后可直接使用 apimgr switch）
+
+使用 -l/--local 参数可仅在当前shell会话中切换配置，不修改全局配置：
+  apimgr switch -l <alias>
+  eval "$(apimgr switch -l <alias>)"`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		alias := args[0]
 
+		// Read the local flag
+		local, _ := cmd.Flags().GetBool("local")
+
 		configManager := config.NewConfigManager()
 
-		// Set the active configuration
-		err := configManager.SetActive(alias)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
+		// Only update global configuration if not in local mode
+		if !local {
+			// Set the active configuration
+			err := configManager.SetActive(alias)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Generate active.env script for auto-loading
+			if err := configManager.GenerateActiveScript(); err != nil {
+				fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+			}
+
+			// 显示同步信息
+			showSyncInfo(alias)
 		}
 
-		// Generate active.env script for auto-loading
-		if err := configManager.GenerateActiveScript(); err != nil {
-			fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
-		}
-
-		// 显示同步信息
-		showSyncInfo(alias)
-
-		// Get the configuration
+		// Get the configuration (needed for generating env vars)
 		apiConfig, err := configManager.Get(alias)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)

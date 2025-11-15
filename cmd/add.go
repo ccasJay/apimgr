@@ -177,28 +177,6 @@ var addCmd = &cobra.Command{
 		hasAlias := len(args) == 1
 
 		switch {
-		case hasSK || hasAK:
-			// 预设模式 - 有预设参数但没有别名，进入交互式
-			presetType := ""
-			if hasSK {
-				presetType = "api_key"
-			} else {
-				presetType = "auth_token"
-			}
-
-			if !isTerminal() {
-				fmt.Println("❌ 当前环境不支持交互式输入，请提供别名:")
-				fmt.Printf("  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]\n",
-					map[bool]string{true: "sk", false: "ak"}[hasSK])
-				os.Exit(1)
-			}
-
-			cfg, err = collector.CollectInteractively(presetType)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-				os.Exit(1)
-			}
-
 		case hasAlias:
 			// 命令行模式 - 有别名和参数
 			alias := args[0]
@@ -231,6 +209,28 @@ var addCmd = &cobra.Command{
 			cfg, err = builder.Build()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "❌ 错误: %v\n", err)
+				os.Exit(1)
+			}
+
+		case hasSK || hasAK:
+			// 预设模式 - 有预设参数但没有别名，进入交互式
+			presetType := ""
+			if hasSK {
+				presetType = "api_key"
+			} else {
+				presetType = "auth_token"
+			}
+
+			if !isTerminal() {
+				fmt.Println("❌ 当前环境不支持交互式输入，请提供别名:")
+				fmt.Printf("  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]\n",
+					map[bool]string{true: "sk", false: "ak"}[hasSK])
+				os.Exit(1)
+			}
+
+			cfg, err = collector.CollectInteractively(presetType)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 				os.Exit(1)
 			}
 
