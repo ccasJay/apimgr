@@ -20,9 +20,9 @@ func SetVersionInfo(v, c, d string) {
 
 var rootCmd = &cobra.Command{
 	Use:   "apimgr",
-	Short: "API密钥和模型配置管理工具",
-	Long:  "一个用于管理Anthropic API密钥和模型配置的命令行工具",
-	// 版本信息将在Execute函数中设置
+	Short: "API key and model configuration management tool",
+	Long:  "A command line tool for managing Anthropic API keys and model configurations",
+	// Version information will be set in the Execute function
 }
 
 // Execute executes the root command

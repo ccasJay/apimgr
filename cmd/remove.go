@@ -14,8 +14,8 @@ func init() {
 
 var removeCmd = &cobra.Command{
 	Use:   "remove [alias]",
-	Short: "删除指定的API配置",
-	Long:  "删除指定别名的API配置",
+	Short: "Remove specified API configuration",
+	Long:  "Remove API configuration with specified alias",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		alias := args[0]
@@ -23,10 +23,10 @@ var removeCmd = &cobra.Command{
 		configManager := config.NewConfigManager()
 		err := configManager.Remove(alias)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("已删除配置: %s\n", alias)
+		fmt.Printf("Configuration removed: %s\n", alias)
 	},
 }

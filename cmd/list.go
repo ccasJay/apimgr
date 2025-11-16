@@ -15,8 +15,8 @@ func init() {
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出所有API配置",
-	Long:  "列出所有已保存的API配置",
+	Short: "List all API configurations",
+	Long:  "List all saved API configurations",
 	Run: func(cmd *cobra.Command, args []string) {
 		configManager := config.NewConfigManager()
 		configs, err := configManager.List()
@@ -26,16 +26,16 @@ var listCmd = &cobra.Command{
 		}
 
 		if len(configs) == 0 {
-			fmt.Println("暂无配置")
+			fmt.Println("No configurations available")
 			return
 		}
 
 		// Get active configuration name
 		activeName, _ := configManager.GetActiveName()
 
-		fmt.Println("可用的配置:")
+		fmt.Println("Available configurations:")
 		for _, config := range configs {
-			// 脱敏显示API密钥或认证令牌
+			// Display masked API key or auth token
 			var authInfo string
 			if config.APIKey != "" {
 				authInfo = "API Key: " + utils.MaskAPIKey(config.APIKey)
@@ -54,7 +54,7 @@ var listCmd = &cobra.Command{
 		}
 
 		if activeName != "" {
-			fmt.Printf("\n* 表示当前活动配置\n")
-		}
+		fmt.Printf("\n* indicates the currently active configuration\n")
+	}
 	},
 }

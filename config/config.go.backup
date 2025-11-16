@@ -16,7 +16,7 @@ import (
 // APIConfig represents a single API configuration
 type APIConfig struct {
 	Alias     string `json:"alias"`
-	Provider  string `json:"provider"` // API provider type
+	Provider  string `json:"provider"` // API提供商类型
 	APIKey    string `json:"api_key"`
 	AuthToken string `json:"auth_token"`
 	BaseURL   string `json:"base_url"`
@@ -32,14 +32,14 @@ type File struct {
 // Manager manages API configurations
 type Manager struct {
 	configPath string
-	mu         sync.Mutex // Mutex to protect concurrent access
+	mu         sync.Mutex // 互斥锁，保护并发访问
 }
 
 // NewConfigManager creates a new Manager with unified config path
 func NewConfigManager() *Manager {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get user home directory: %v", err))
+		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
 	// Check XDG_CONFIG_HOME environment variable for custom config location
@@ -58,16 +58,16 @@ func NewConfigManager() *Manager {
 	// Ensure XDG directory exists
 	configDir := filepath.Dir(xdgConfigPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		panic(fmt.Sprintf("Failed to create config directory: %v", err))
+		panic(fmt.Sprintf("无法创建配置目录: %v", err))
 	}
 
 	// Migrate from old config if it exists and new config doesn't
 	if shouldMigrateConfig(oldConfigPath, xdgConfigPath) {
 		if err := migrateConfig(oldConfigPath, xdgConfigPath); err != nil {
-			fmt.Printf("⚠️  Failed to migrate config: %v\n", err)
+			fmt.Printf("⚠️  配置迁移失败: %v\n", err)
 			// Continue with new config path anyway
 		} else {
-			fmt.Println("✅ Migrated config from old location successfully")
+			fmt.Println("✅ 从旧配置位置迁移配置成功")
 		}
 	}
 
@@ -88,11 +88,11 @@ func shouldMigrateConfig(oldPath, newPath string) bool {
 func migrateConfig(oldPath, newPath string) error {
 	data, err := os.ReadFile(oldPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read old config file: %v", err)
+		return fmt.Errorf("读取旧配置文件失败: %v", err)
 	}
 
 	if len(data) == 0 {
-		return fmt.Errorf("Old config file is empty")
+		return fmt.Errorf("旧配置文件为空")
 	}
 
 	// Validate that it's a valid config
@@ -101,49 +101,49 @@ func migrateConfig(oldPath, newPath string) error {
 		// Try old format (array of configs)
 		var tempConfigs []APIConfig
 		if err2 := json.Unmarshal(data, &tempConfigs); err2 != nil {
-			return fmt.Errorf("Old config file format is invalid: %v", err)
+			return fmt.Errorf("旧配置文件格式无效: %v", err)
 		}
 	}
 
 	// Write to new location with locking
 	file, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("Failed to open new config file: %v", err)
+		return fmt.Errorf("打开新配置文件失败: %v", err)
 	}
 
 	// Lock the new config file exclusively
 	if err := lockFileExclusive(file); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to lock new config file: %v", err)
+		return fmt.Errorf("锁定新配置文件失败: %v", err)
 	}
 
 	// Write data while holding the lock
 	_, err = file.Write(data)
 	if err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to write new config file: %v", err)
+		return fmt.Errorf("写入新配置文件失败: %v", err)
 	}
 
 	// Ensure data is flushed
 	if err := file.Sync(); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to sync new config file to disk: %v", err)
+		return fmt.Errorf("同步新配置文件失败: %v", err)
 	}
 
 	// Unlock and close
 	if err := unlockFile(file); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to unlock new config file: %v", err)
+		return fmt.Errorf("解锁新配置文件失败: %v", err)
 	}
 	if err := file.Close(); err != nil {
-		return fmt.Errorf("Failed to close new config file: %v", err)
+		return fmt.Errorf("关闭新配置文件失败: %v", err)
 	}
 
 	// Backup old config
 	backupPath := oldPath + ".backup"
 	if err := os.Rename(oldPath, backupPath); err != nil {
 		// Don't fail migration if backup fails
-		fmt.Printf("⚠️  Failed to create backup of old config: %v\n", err)
+		fmt.Printf("⚠️  无法创建旧配置备份: %v\n", err)
 	}
 
 	return nil
@@ -168,24 +168,24 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 		if os.IsNotExist(err) {
 			return &File{Configs: []APIConfig{}}, nil
 		}
-		return nil, fmt.Errorf("Failed to open config file: %v", err)
+		return nil, fmt.Errorf("打开配置文件失败: %v", err)
 	}
 	defer file.Close()
 
 	// Lock the file for shared read access (LOCK_SH)
 	if err := cm.lockFileShared(file); err != nil {
-		return nil, fmt.Errorf("Failed to lock config file: %v", err)
+		return nil, fmt.Errorf("锁定配置文件失败: %v", err)
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
-			fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
+			fmt.Printf("⚠️  解锁文件失败: %v\n", err)
 		}
 	}()
 
 	// Read from the locked file descriptor instead of using os.ReadFile
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read config file: %v", err)
+		return nil, fmt.Errorf("读取配置文件失败: %v", err)
 	}
 
 	if len(data) == 0 {
@@ -200,7 +200,7 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 		if err2 := json.Unmarshal(data, &configs); err2 == nil {
 			return &File{Configs: configs}, nil
 		}
-		return nil, fmt.Errorf("Failed to parse config file: %v", err)
+		return nil, fmt.Errorf("解析配置文件失败: %v", err)
 	}
 
 	return &configFile, nil
@@ -210,35 +210,35 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 func (cm *Manager) saveConfigFile(configFile *File) error {
 	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Failed to serialize config: %v", err)
+		return fmt.Errorf("序列化配置失败: %v", err)
 	}
 
 	// Open the file with write access (create if not exists)
 	file, err := os.OpenFile(cm.configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("Failed to open config file: %v", err)
+		return fmt.Errorf("打开配置文件失败: %v", err)
 	}
 	defer file.Close()
 
 	// Lock the file for exclusive write access
 	if err := cm.lockFile(file); err != nil {
-		return fmt.Errorf("Failed to lock config file: %v", err)
+		return fmt.Errorf("锁定配置文件失败: %v", err)
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
-			fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
+			fmt.Printf("⚠️  解锁文件失败: %v\n", err)
 		}
 	}()
 
 	// Write the file while holding the lock
 	_, err = file.Write(data)
 	if err != nil {
-		return fmt.Errorf("Failed to write config file: %v", err)
+		return fmt.Errorf("写入配置文件失败: %v", err)
 	}
 
 	// Ensure data is flushed to disk
 	if err := file.Sync(); err != nil {
-		return fmt.Errorf("Failed to sync config file: %v", err)
+		return fmt.Errorf("同步配置文件失败: %v", err)
 	}
 
 	return nil
@@ -336,7 +336,7 @@ func (cm *Manager) Remove(alias string) error {
 		}
 	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+	return fmt.Errorf("配置 '%s' 不存在", alias)
 }
 
 // Get returns a configuration by alias
@@ -355,7 +355,7 @@ func (cm *Manager) Get(alias string) (*APIConfig, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("configuration '%s' does not exist", alias)
+	return nil, fmt.Errorf("配置 '%s' 不存在", alias)
 }
 
 // List returns all configurations
@@ -390,7 +390,7 @@ func (cm *Manager) SetActive(alias string) error {
 	}
 
 	if !found {
-		return fmt.Errorf("configuration '%s' does not exist", alias)
+		return fmt.Errorf("配置 '%s' 不存在", alias)
 	}
 
 	configFile.Active = alias
@@ -408,7 +408,7 @@ func (cm *Manager) GetActive() (*APIConfig, error) {
 	}
 
 	if configFile.Active == "" {
-		return nil, fmt.Errorf("No active configuration set")
+		return nil, fmt.Errorf("未设置活动配置")
 	}
 
 	for _, config := range configFile.Configs {
@@ -417,7 +417,7 @@ func (cm *Manager) GetActive() (*APIConfig, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("active configuration '%s' does not exist", configFile.Active)
+	return nil, fmt.Errorf("活动配置 '%s' 不存在", configFile.Active)
 }
 
 // GetActiveName returns the active configuration name
@@ -435,10 +435,10 @@ func (cm *Manager) GetActiveName() (string, error) {
 // validateConfig validates a configuration
 func (cm *Manager) validateConfig(config APIConfig) error {
 	if config.Alias == "" {
-		return fmt.Errorf("Alias cannot be empty")
+		return fmt.Errorf("别名不能为空")
 	}
 
-	// Default provider is anthropic
+	// 默认提供商为anthropic
 	providerName := config.Provider
 	if providerName == "" {
 		providerName = "anthropic"
@@ -446,13 +446,13 @@ func (cm *Manager) validateConfig(config APIConfig) error {
 
 	// 至少需要一种认证方式
 	if config.APIKey == "" && config.AuthToken == "" {
-		return fmt.Errorf("API key and auth token cannot both be empty")
+		return fmt.Errorf("API密钥和认证令牌不能同时为空")
 	}
 
 	// 验证提供商
 	provider, err := providers.Get(providerName)
 	if err != nil {
-		return fmt.Errorf("Unknown API provider: %s", providerName)
+		return fmt.Errorf("未知的API提供商: %s", providerName)
 	}
 
 	// 提供商特定验证
@@ -463,7 +463,7 @@ func (cm *Manager) validateConfig(config APIConfig) error {
 	// URL格式验证
 	if config.BaseURL != "" {
 		if !utils.ValidateURL(config.BaseURL) {
-			return fmt.Errorf("Invalid URL format: %s", config.BaseURL)
+			return fmt.Errorf("无效的URL格式: %s", config.BaseURL)
 		}
 	}
 
@@ -505,7 +505,7 @@ func (cm *Manager) UpdatePartial(alias string, updates map[string]string) error 
 		}
 	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+	return fmt.Errorf("配置 '%s' 不存在", alias)
 }
 
 // RenameAlias renames a configuration alias
@@ -521,7 +521,7 @@ func (cm *Manager) RenameAlias(oldAlias, newAlias string) error {
 	// Check if new alias already exists
 	for _, cfg := range configFile.Configs {
 		if cfg.Alias == newAlias {
-			return fmt.Errorf("configuration '%s' already exists", newAlias)
+			return fmt.Errorf("配置 '%s' 已存在", newAlias)
 		}
 	}
 
@@ -536,7 +536,7 @@ func (cm *Manager) RenameAlias(oldAlias, newAlias string) error {
 	}
 
 	if !found {
-		return fmt.Errorf("configuration '%s' does not exist", oldAlias)
+		return fmt.Errorf("配置 '%s' 不存在", oldAlias)
 	}
 
 	// Update active config if needed
@@ -579,24 +579,24 @@ func (cm *Manager) GenerateActiveScript() error {
 		return nil
 	}
 
-	// Generate activation script content
+	// 生成激活脚本内容
 	envScript := generateEnvScript(active)
 
-	// Write to file
+	// 写入文件
 	activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
 	if err := os.WriteFile(activeEnvPath, []byte(envScript), 0600); err != nil {
 		return err
 	}
 
-	// Sync to global Claude Code settings (optional feature, doesn't affect main flow)
+	// 同步到全局 Claude Code 设置（可选功能，不影响主流程）
 	if syncErr := cm.syncClaudeSettings(active); syncErr != nil {
-		fmt.Printf("⚠️  Failed to sync to global Claude Code settings: %v\n", syncErr)
+		fmt.Printf("⚠️  同步全局 Claude Code 设置失败: %v\n", syncErr)
 	}
 
-	// Sync to project-level config file (if .claude directory exists)
+	// 同步到项目级配置文件（如果存在 .claude 目录）
 	if syncErr := cm.syncProjectClaudeConfig(active); syncErr != nil {
-		// Failed project-level sync won't error, since not all projects have a .claude directory
-		fmt.Printf("⚠️  Failed to sync to project-level Claude Code settings: %v\n", syncErr)
+		// 项目级同步失败不报错，因为不是所有项目都有 .claude 目录
+		fmt.Printf("⚠️  同步项目级 Claude Code 设置失败: %v\n", syncErr)
 	}
 
 	return nil
@@ -641,24 +641,24 @@ func generateEnvScript(cfg *APIConfig) string {
 func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
-	// Check if Claude Code config file exists
+	// 检查 Claude Code 配置文件是否存在
 	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
-		// File doesn't exist, skip sync
+		// 文件不存在，跳过同步
 		return nil
 	}
 
-	// Read existing settings
+	// 读取现有设置
 	data, err := os.ReadFile(claudeSettingsPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read global Claude Code settings: %v", err)
+		return fmt.Errorf("读取全局 Claude Code 设置失败: %v", err)
 	}
 
 	var settings map[string]interface{}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return fmt.Errorf("Failed to parse global Claude Code settings: %v", err)
+		return fmt.Errorf("解析全局 Claude Code 设置失败: %v", err)
 	}
 
-	// Ensure env field exists
+	// 确保 env 字段存在
 	if settings["env"] == nil {
 		settings["env"] = make(map[string]interface{})
 	}
@@ -666,7 +666,7 @@ func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 	env := settings["env"].(map[string]interface{})
 
 	// 更新环境变量
-	// Clear old ANTHROPIC related variables
+	// 清除旧的 ANTHROPIC 相关变量
 	delete(env, "ANTHROPIC_API_KEY")
 	delete(env, "ANTHROPIC_AUTH_TOKEN")
 	delete(env, "ANTHROPIC_BASE_URL")
@@ -685,14 +685,14 @@ func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 		env["ANTHROPIC_MODEL"] = cfg.Model
 	}
 
-	// Write back to file
+	// 写回文件
 	updatedData, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化全局 Claude Code 设置失败: %v", err)
 	}
 
 	if err := os.WriteFile(claudeSettingsPath, updatedData, 0600); err != nil {
-		return fmt.Errorf("Failed to write global Claude Code settings: %v", err)
+		return fmt.Errorf("写入全局 Claude Code 设置失败: %v", err)
 	}
 
 	return nil
@@ -715,15 +715,15 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 		return nil
 	}
 
-	// Read project-level config
+	// 读取项目级配置
 	data, err := os.ReadFile(projectClaudePath)
 	if err != nil {
-		return fmt.Errorf("Failed to read project-level Claude Code settings: %v", err)
+		return fmt.Errorf("读取项目级 Claude Code 设置失败: %v", err)
 	}
 
 	var settings map[string]interface{}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return fmt.Errorf("Failed to parse project-level Claude Code settings: %v", err)
+		return fmt.Errorf("解析项目级 Claude Code 设置失败: %v", err)
 	}
 
 	// 更新 env 字段
@@ -733,7 +733,7 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 
 	env := settings["env"].(map[string]interface{})
 
-	// Clear old ANTHROPIC related variables
+	// 清除旧的 ANTHROPIC 相关变量
 	delete(env, "ANTHROPIC_API_KEY")
 	delete(env, "ANTHROPIC_AUTH_TOKEN")
 	delete(env, "ANTHROPIC_BASE_URL")
@@ -752,16 +752,16 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 		env["ANTHROPIC_MODEL"] = cfg.Model
 	}
 
-	// Write back to file
+	// 写回文件
 	updatedData, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Failed to serialize project-level Claude Code settings: %v", err)
+		return fmt.Errorf("序列化项目级 Claude Code 设置失败: %v", err)
 	}
 
 	if err := os.WriteFile(projectClaudePath, updatedData, 0600); err != nil {
-		return fmt.Errorf("Failed to write project-level Claude Code settings: %v", err)
+		return fmt.Errorf("写入项目级 Claude Code 设置失败: %v", err)
 	}
 
-	fmt.Printf("✅ Project-level Claude Code configuration updated: %s\n", projectClaudePath)
+	fmt.Printf("✅ 项目级 Claude Code 配置已更新: %s\n", projectClaudePath)
 	return nil
 }

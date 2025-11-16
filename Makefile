@@ -4,16 +4,16 @@ build:
 	go build -o apimgr .
 
 install: build
-	@echo "✅ 项目目录中的 apimgr 已更新"
-	@echo "如需系统安装，请在Terminal中运行: sudo cp apimgr /usr/local/bin/apimgr"
+	@echo "✅ apimgr in project directory has been updated"
+	@echo "To install system-wide, run in Terminal: sudo cp apimgr /usr/local/bin/apimgr"
 
 upgrade: build
-	@echo "✅ 项目目录中的 apimgr 已更新"
-	@echo "如需系统安装，请在Terminal中运行: sudo cp apimgr /usr/local/bin/apimgr"
+	@echo "✅ apimgr in project directory has been updated"
+	@echo "To install system-wide, run in Terminal: sudo cp apimgr /usr/local/bin/apimgr"
 
 uninstall:
 	sudo rm -f /usr/local/bin/apimgr
-	@echo "✅ 已卸载 /usr/local/bin/apimgr"
+	@echo "✅ /usr/local/bin/apimgr has been uninstalled"
 
 run: build
 	./apimgr
