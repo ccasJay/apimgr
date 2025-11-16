@@ -15,12 +15,12 @@ var (
 
 var installCmd = &cobra.Command{
 	Use:   "install",
-	Short: "安装shell初始化脚本",
-	Long:  "在shell配置文件中添加自动加载命令，使新终端自动加载活动配置",
+	Short: "Install shell initialization script",
+	Long:  "Add auto-load command to shell configuration file, so new terminals automatically load active configuration",
 	Run: func(cmd *cobra.Command, args []string) {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: 无法获取用户主目录: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to get user home directory: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -33,8 +33,8 @@ var installCmd = &cobra.Command{
 		} else if strings.Contains(shell, "bash") {
 			rcFile = filepath.Join(homeDir, ".bashrc")
 		} else {
-			fmt.Fprintf(os.Stderr, "错误: 不支持的shell: %s\n", shell)
-			fmt.Fprintf(os.Stderr, "请手动添加以下内容到你的shell配置文件:\n")
+			fmt.Fprintf(os.Stderr, "Error: Unsupported shell: %s\n", shell)
+			fmt.Fprintf(os.Stderr, "Please manually add the following to your shell configuration file:\n")
 			fmt.Fprintf(os.Stderr, "\nif command -v apimgr &> /dev/null; then\n")
 			fmt.Fprintf(os.Stderr, "  eval \"$(apimgr load-active)\"\n")
 			fmt.Fprintf(os.Stderr, "fi\n")
@@ -46,7 +46,7 @@ var installCmd = &cobra.Command{
 if command -v apimgr &> /dev/null; then
   # Auto-load active configuration on shell startup
   eval "$(command apimgr load-active)"
-  
+
   # Wrap apimgr command to handle 'switch' automatically
   # This allows 'apimgr switch' to directly modify environment variables
   apimgr() {
@@ -70,20 +70,20 @@ fi
 			if _, err := os.Stat(rcFile); err == nil {
 				content, err := os.ReadFile(rcFile)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "错误: 无法读取 %s: %v\n", rcFile, err)
+					fmt.Fprintf(os.Stderr, "Error: Failed to read %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
 
 				// Check for new version (with apimgr() function wrapper)
 				if strings.Contains(string(content), "apimgr load-active") {
 					if strings.Contains(string(content), "apimgr() {") {
-						fmt.Printf("✓ 已安装最新版本到 %s\n", rcFile)
-						fmt.Printf("\n提示: 运行 'source %s' 使其生效\n", rcFile)
+						fmt.Printf("✓ Latest version already installed to %s\n", rcFile)
+						fmt.Printf("\nTip: Run 'source %s' to take effect\n", rcFile)
 						return
 					}
-					fmt.Printf("⚠️  检测到旧版本安装\n")
-					fmt.Printf("建议运行 'apimgr install --force' 更新到新版本\n")
-					fmt.Printf("或手动更新 %s 中的 apimgr 配置\n", rcFile)
+					fmt.Printf("⚠️  Detected old version installation\n")
+					fmt.Printf("Suggested to run 'apimgr install --force' to update to new version\n")
+					fmt.Printf("Or manually update apimgr configuration in %s\n", rcFile)
 					return
 				}
 			}
@@ -92,7 +92,7 @@ fi
 			if _, err := os.Stat(rcFile); err == nil {
 				content, err := os.ReadFile(rcFile)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "错误: 无法读取 %s: %v\n", rcFile, err)
+					fmt.Fprintf(os.Stderr, "Error: Failed to read %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
 
@@ -131,18 +131,18 @@ fi
 				// Write back the cleaned content
 				err = os.WriteFile(rcFile, []byte(strings.Join(newLines, "\n")), 0600)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "错误: 无法更新 %s: %v\n", rcFile, err)
+					fmt.Fprintf(os.Stderr, "Error: Failed to update %s: %v\n", rcFile, err)
 					os.Exit(1)
 				}
 
-				fmt.Printf("✓ 已清除旧配置\n")
+				fmt.Printf("✓ Old configuration cleared\n")
 			}
 		}
 
 		// Append to rc file
 		f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: 无法打开 %s: %v\n", rcFile, err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to open %s: %v\n", rcFile, err)
 			os.Exit(1)
 		}
 		defer f.Close()
@@ -150,34 +150,34 @@ fi
 		// Write the script to the file
 		bytesWritten, err := f.WriteString(initScript)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: 无法写入 %s: %v\n", rcFile, err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to write to %s: %v\n", rcFile, err)
 			os.Exit(1)
 		}
 
 		// Close file explicitly to ensure content is flushed to disk
 		err = f.Close()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: 无法关闭文件 %s: %v\n", rcFile, err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to close file %s: %v\n", rcFile, err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("✓ 成功安装到 %s (写入 %d 字节)\n\n", rcFile, bytesWritten)
-		fmt.Printf("请运行以下命令使其生效:\n")
+		fmt.Printf("✓ Successfully installed to %s (%d bytes written)\n\n", rcFile, bytesWritten)
+		fmt.Printf("Please run the following command to take effect:\n")
 		fmt.Printf("  source %s\n\n", rcFile)
-		fmt.Printf("或者重新打开终端\n\n")
-		fmt.Printf("安装后，你可以直接使用:\n")
-		fmt.Printf("  apimgr switch <配置别名>  # 自动切换并应用环境变量\n")
-		fmt.Printf("  apimgr list               # 列出所有配置\n")
-		fmt.Printf("  apimgr status             # 查看当前配置状态\n")
+		fmt.Printf("Or reopen the terminal\n\n")
+		fmt.Printf("After installation, you can directly use:\n")
+		fmt.Printf("  apimgr switch <config_alias>  # Automatically switch and apply environment variables\n")
+		fmt.Printf("  apimgr list               # List all configurations\n")
+		fmt.Printf("  apimgr status             # View current configuration status\n")
 
 		// Verify that the file was actually modified by checking if the script exists in the file
 		updatedContent, err := os.ReadFile(rcFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "警告: 无法验证 %s 是否已更新: %v\n", rcFile, err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to verify if %s was updated: %v\n", rcFile, err)
 		} else if strings.Contains(string(updatedContent), "apimgr() {") {
-			fmt.Printf("✓ 验证: 配置已成功写入到 %s\n", rcFile)
+			fmt.Printf("✓ Verification: Configuration successfully written to %s\n", rcFile)
 		} else {
-			fmt.Fprintf(os.Stderr, "警告: 验证失败，配置可能未正确写入到 %s\n", rcFile)
+			fmt.Fprintf(os.Stderr, "Warning: Verification failed, configuration may not be correctly written to %s\n", rcFile)
 		}
 	},
 }

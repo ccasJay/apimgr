@@ -1,6 +1,6 @@
 package utils
 
-// MaskAPIKey 将API密钥脱敏显示
+// MaskAPIKey masks the API key for display
 func MaskAPIKey(key string) string {
 	if len(key) <= 8 {
 		return "****"

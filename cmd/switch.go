@@ -11,20 +11,20 @@ import (
 
 func init() {
 	rootCmd.AddCommand(switchCmd)
-	// 添加本地切换参数
-	switchCmd.Flags().BoolP("local", "l", false, "仅在当前shell生效，不修改全局配置")
+	// Add local switch parameter
+	switchCmd.Flags().BoolP("local", "l", false, "Only take effect in current shell, does not modify global configuration")
 }
 
 var switchCmd = &cobra.Command{
 	Use:   "switch [alias]",
-	Short: "切换到指定的API配置",
-	Long: `切换到指定的API配置，并输出export命令用于环境变量设置
+	Short: "Switch to specified API configuration",
+	Long: `Switch to specified API configuration and output export commands for environment variables
 
-要使环境变量在当前shell中生效，有以下两种方式：
-1. 使用 eval: eval "$(apimgr switch <alias>)"
-2. 安装shell集成: apimgr install （推荐，安装后可直接使用 apimgr switch）
+To make environment variables effective in current shell, there are two methods:
+1. Using eval: eval "$(apimgr switch <alias>)"
+2. Install shell integration: apimgr install (recommended, allows direct use of apimgr switch after installation)
 
-使用 -l/--local 参数可仅在当前shell会话中切换配置，不修改全局配置：
+Using -l/--local parameter switches configuration only in current shell session without modifying global configuration:
   apimgr switch -l <alias>
   eval "$(apimgr switch -l <alias>)"`,
 	Args: cobra.ExactArgs(1),
@@ -41,23 +41,23 @@ var switchCmd = &cobra.Command{
 			// Set the active configuration
 			err := configManager.SetActive(alias)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
 
 			// Generate active.env script for auto-loading
 			if err := configManager.GenerateActiveScript(); err != nil {
-				fmt.Fprintf(os.Stderr, "警告: 生成激活脚本失败: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: Failed to generate activation script: %v\n", err)
 			}
 
-			// 显示同步信息
+			// Show sync information
 			showSyncInfo(alias)
 		}
 
 		// Get the configuration (needed for generating env vars)
 		apiConfig, err := configManager.Get(alias)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -84,13 +84,13 @@ var switchCmd = &cobra.Command{
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
 
 		// Print success message to stderr so it doesn't interfere with eval
-		fmt.Fprintf(os.Stderr, "✓ 已切换到配置: %s\n", alias)
+		fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
 	},
 }
 
-// showSyncInfo 显示同步状态信息
+// showSyncInfo shows sync status information
 func showSyncInfo(alias string) {
-	// 检查同步状态
+	// Check sync status
 	globalClaudePath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 	projectClaudePath := filepath.Join(".", ".claude", "settings.json")
 
@@ -105,13 +105,13 @@ func showSyncInfo(alias string) {
 	}
 
 	if hasGlobal || hasProject {
-		fmt.Fprintf(os.Stderr, "\n✅ 配置同步状态:\n")
+		fmt.Fprintf(os.Stderr, "\n✅ Configuration sync status:\n")
 		if hasGlobal {
-			fmt.Fprintf(os.Stderr, "   • 全局 Claude Code: ~/.claude/settings.json\n")
+			fmt.Fprintf(os.Stderr, "   • Global Claude Code: ~/.claude/settings.json\n")
 		}
 		if hasProject {
-			fmt.Fprintf(os.Stderr, "   • 项目级 Claude Code: %s\n", projectClaudePath)
+			fmt.Fprintf(os.Stderr, "   • Project-level Claude Code: %s\n", projectClaudePath)
 		}
-		fmt.Fprintf(os.Stderr, "\n💡 配置已自动同步到 Claude Code，可以直接使用。\n")
+		fmt.Fprintf(os.Stderr, "\n💡 Configuration has been automatically synced to Claude Code, ready to use.\n")
 	}
 }

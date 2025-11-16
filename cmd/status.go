@@ -15,8 +15,8 @@ func init() {
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "显示当前激活的配置",
-	Long:  "显示当前激活的API配置信息，包括全局配置和当前shell环境",
+	Short: "Show currently active configuration",
+	Long:  "Show currently active API configuration information, including global configuration and current shell environment",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get shell environment variables
 		shellAPIKey := os.Getenv("ANTHROPIC_API_KEY")
@@ -33,15 +33,15 @@ var statusCmd = &cobra.Command{
 			globalActiveAlias = globalActiveConfig.Alias
 		}
 
-		fmt.Println("当前配置状态:")
+		fmt.Println("Current configuration status:")
 		fmt.Println("=========================================")
 
 		// Show global active configuration
-		fmt.Println("1. 全局活跃配置 (配置文件):")
+		fmt.Println("1. Global active configuration (config file):")
 		if globalErr != nil {
-			fmt.Println("   未设置全局活跃配置")
+			fmt.Println("   No global active configuration set")
 		} else {
-			fmt.Printf("   别名: %s\n", globalActiveConfig.Alias)
+			fmt.Printf("   Alias: %s\n", globalActiveConfig.Alias)
 			if globalActiveConfig.APIKey != "" {
 				fmt.Printf("   API Key: %s\n", utils.MaskAPIKey(globalActiveConfig.APIKey))
 			}
@@ -57,12 +57,12 @@ var statusCmd = &cobra.Command{
 		}
 
 		// Show shell environment configuration
-		fmt.Println("\n2. 当前Shell环境:")
+		fmt.Println("\n2. Current Shell environment:")
 		if shellAPIKey == "" && shellAuthToken == "" {
-			fmt.Println("   未设置环境变量")
+			fmt.Println("   No environment variables set")
 		} else {
 			if shellActiveAlias != "" {
-				fmt.Printf("   别名: %s\n", shellActiveAlias)
+				fmt.Printf("   Alias: %s\n", shellActiveAlias)
 			}
 			if shellAPIKey != "" {
 				fmt.Printf("   API Key: %s\n", utils.MaskAPIKey(shellAPIKey))
@@ -82,18 +82,18 @@ var statusCmd = &cobra.Command{
 		fmt.Println("\n=========================================")
 		if shellAPIKey != "" || shellAuthToken != "" {
 			if globalErr != nil || (globalActiveAlias != "" && globalActiveAlias != shellActiveAlias) {
-				fmt.Println("💡 当前使用的是Shell环境配置 (覆盖了全局配置)")
+				fmt.Println("💡 Currently using Shell environment configuration (overrides global configuration)")
 			} else {
-				fmt.Println("💡 当前使用的是全局配置")
+				fmt.Println("💡 Currently using global configuration")
 			}
 		} else {
 			if globalErr != nil {
-				fmt.Println("💡 未设置任何配置")
+				fmt.Println("💡 No configuration set")
 			} else {
-				fmt.Println("💡 当前使用的是全局配置 (Shell未设置环境变量)")
+				fmt.Println("💡 Currently using global configuration (Shell has no environment variables set)")
 			}
 		}
 
-		fmt.Println("\n💡 提示: 运行 'apimgr install' 安装shell集成以获得更佳体验")
+		fmt.Println("\n💡 Tip: Run 'apimgr install' to install shell integration for better experience")
 	},
 }
