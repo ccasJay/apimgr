@@ -14,8 +14,8 @@ func init() {
 
 var loadActiveCmd = &cobra.Command{
 	Use:   "load-active",
-	Short: "加载活动配置的环境变量",
-	Long:  "输出活动配置的环境变量export命令。在shell初始化脚本中使用: eval \"$(apimgr load-active)\"",
+	Short: "Load environment variables for active configuration",
+	Long:  "Output export commands for active configuration's environment variables. Use in shell initialization scripts: eval \"$(apimgr load-active)\"",
 	Run: func(cmd *cobra.Command, args []string) {
 		configManager := config.NewConfigManager()
 

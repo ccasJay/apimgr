@@ -36,3 +36,6 @@ go.work
 # OS 目录
 .DS_Store
 Thumbs.db
+
+#Claude Code related
+.claude/

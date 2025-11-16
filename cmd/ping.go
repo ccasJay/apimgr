@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"apimgr/config"
+	"apimgr/internal/providers"
 	"github.com/spf13/cobra"
 )
 
@@ -19,19 +21,21 @@ var (
 	outputJSON    bool
 	requestMethod string
 	timeout       time.Duration
+	testRealAPI   bool   // Test real API functionality (simulate ClaudeCode usage)
+	apiPath       string // Custom path for real API testing
 )
 
-// 增强URL验证：检查协议和主机名
+// Enhanced URL validation: Check protocol and hostname
 func isValidURL(u string) bool {
 	parsed, err := url.ParseRequestURI(u)
 	if err != nil {
 		return false
 	}
-	// 确保协议是http或https
+	// Ensure protocol is http or https
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return false
 	}
-	// 确保主机名存在
+	// Ensure hostname exists
 	if parsed.Host == "" {
 		return false
 	}
@@ -40,16 +44,16 @@ func isValidURL(u string) bool {
 
 var pingCmd = &cobra.Command{
 	Use:   "ping [alias]",
-	Short: "测试API配置的连通性",
-	Long: `测试API配置的连通性 - 支持多种模式：
+	Short: "Test API configuration connectivity",
+	Long: `Test API configuration connectivity - support for multiple modes:
 
-1. 测试活动配置:
+1. Test active configuration:
    apimgr ping
 
-2. 测试特定配置:
+2. Test specific configuration:
    apimgr ping my-config
 
-3. 测试自定义URL:
+3. Test custom URL:
    apimgr ping -u https://api.example.com`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -57,52 +61,64 @@ var pingCmd = &cobra.Command{
 
 		var baseURL string
 
-		// 决定要测试的URL
+		// Decide which URL to test
 		isCustomURL := cmd.Flags().Lookup("url").Changed
 		switch {
 		case isCustomURL:
-			// 自定义URL模式
+			// Custom URL mode
 			baseURL = customURL
-			fmt.Printf("正在测试自定义URL: %s\n", baseURL)
+			fmt.Printf("Testing custom URL: %s\n", baseURL)
 
 		case len(args) == 1:
-			// 特定配置模式
+			// Specific configuration mode
 			alias := args[0]
 			cfg, err := configManager.Get(alias)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "❌ 错误: %v\n", err)
+				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				os.Exit(1)
 			}
 			baseURL = cfg.BaseURL
-			fmt.Printf("正在测试配置: %s\n", alias)
+			// Apply URL normalization for configured API
+			if cfg.Provider != "" {
+				if provider, err := providers.Get(cfg.Provider); err == nil {
+					baseURL = provider.NormalizeConfig(baseURL)
+				}
+			}
+			fmt.Printf("Testing configuration: %s\n", alias)
 
 		default:
-			// 活动配置模式
+			// Active configuration mode
 			cfg, err := configManager.GetActive()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "❌ 错误: %v\n", err)
+				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				os.Exit(1)
 			}
 			baseURL = cfg.BaseURL
-			fmt.Printf("正在测试活动配置: %s\n", cfg.Alias)
+			// Apply URL normalization for configured API
+			if cfg.Provider != "" {
+				if provider, err := providers.Get(cfg.Provider); err == nil {
+					baseURL = provider.NormalizeConfig(baseURL)
+				}
+			}
+			fmt.Printf("Testing active configuration: %s\n", cfg.Alias)
 		}
 
-		// 确保URL有默认值
+		// Ensure URL has default value
 		if baseURL == "" {
 			baseURL = "https://api.anthropic.com"
-			fmt.Printf("⚠️  注意: 使用默认URL: %s\n", baseURL)
+			fmt.Printf("⚠️  Note: Using default URL: %s\n", baseURL)
 		}
 
-		// 执行连通性测试
+		// Perform connectivity test
 		start := time.Now()
 
-		// 创建优化的HTTP客户端（连接池 + 自定义超时）
+		// Create optimized HTTP client (connection pooling + custom timeout)
 		client := &http.Client{
 			Timeout: timeout,
 			Transport: &http.Transport{
-				MaxIdleConns:          10,               // 最大空闲连接数
-				IdleConnTimeout:       30 * time.Second, // 空闲连接超时
-				TLSHandshakeTimeout:   5 * time.Second,  // TLS握手超时
+				MaxIdleConns:          10,               // Maximum idle connections
+				IdleConnTimeout:       30 * time.Second, // Idle connection timeout
+				TLSHandshakeTimeout:   5 * time.Second,  // TLS handshake timeout
 				ExpectContinueTimeout: 1 * time.Second,
 			},
 		}
@@ -111,37 +127,105 @@ var pingCmd = &cobra.Command{
 		if !isValidURL(baseURL) {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error":   "无效的URL格式",
+					"error":   "Invalid URL format",
 					"url":     baseURL,
 					"success": false,
 				})
 				fmt.Println(string(errData))
 			} else {
-				fmt.Fprintf(os.Stderr, "❌ 错误: 无效的URL格式: %s\n", baseURL)
-				fmt.Fprintln(os.Stderr, "URL必须包含http或https协议和有效的主机名")
+				fmt.Fprintf(os.Stderr, "❌ Error: Invalid URL format: %s\n", baseURL)
+				fmt.Fprintln(os.Stderr, "URL must include http or https protocol and valid hostname")
 			}
 			os.Exit(1)
 		}
 
-		// 发送请求
-		req, err := http.NewRequest(requestMethod, baseURL, nil)
+		// 为配置的API添加认证头（自定义URL模式不添加）
+		var cfg *config.APIConfig
+		var apiErr error
+
+		if !isCustomURL {
+			// 获取配置
+			if len(args) == 1 {
+				cfg, apiErr = configManager.Get(args[0])
+			} else {
+				cfg, apiErr = configManager.GetActive()
+			}
+		}
+
+		// 构建最终URL（添加自定义路径）
+		finalURL := baseURL
+		if testRealAPI && apiPath != "" {
+			// 如果有自定义路径，添加到URL
+			// 确保没有重复的斜杠
+			if strings.HasSuffix(baseURL, "/") && strings.HasPrefix(apiPath, "/") {
+				finalURL = baseURL + apiPath[1:]
+			} else if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(apiPath, "/") {
+				finalURL = baseURL + "/" + apiPath
+			} else {
+				finalURL = baseURL + apiPath
+			}
+		}
+
+		// 决定要使用的Request method和体
+		finalMethod := requestMethod
+		var requestBody io.Reader = nil
+		var contentType string = ""
+
+		// 如果是真实API测试，准备POST请求
+		if testRealAPI && !isCustomURL && apiErr == nil && cfg != nil {
+			finalMethod = "POST"
+			contentType = "application/json"
+
+			// 使用默认模型或配置中的模型
+			model := cfg.Model
+			if model == "" {
+				model = "doubao-seed-code-preview-latest" // 默认Doubao模型
+			}
+
+			// 创建简单的请求体（模拟ClaudeCode的使用方式）
+			// 使用标准的聊天API格式
+			reqBody := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"ping test"}]}`, model)
+			requestBody = strings.NewReader(reqBody)
+		}
+
+		// 创建请求
+		req, err := http.NewRequest(finalMethod, finalURL, requestBody)
 		if err != nil {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error":   "创建请求失败",
+					"error":   "failed to create request",
 					"message": err.Error(),
 					"success": false,
 				})
 				fmt.Println(string(errData))
 			} else {
-				fmt.Fprintf(os.Stderr, "❌ 错误: 创建请求失败: %v\n", err)
+				fmt.Fprintf(os.Stderr, "❌ Error: Failed to create request: %v\n", err)
 			}
 			os.Exit(1)
 		}
 
+		// 设置Content-Type头（如果需要）
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+
+		// 添加适当的认证头
+		if !isCustomURL && apiErr == nil && cfg != nil {
+			if cfg.AuthToken != "" {
+				// 对于使用AuthToken的配置，使用Bearer认证
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AuthToken))
+			} else if cfg.APIKey != "" {
+				// 对于使用APIKey的配置，使用Anthropic风格的API-Key头
+				req.Header.Set("x-api-key", cfg.APIKey)
+				// 同时支持Anthropic的格式
+				req.Header.Set("API-Key", cfg.APIKey)
+			}
+		}
+
+
 		// 进度指示器
 		if !outputJSON {
-			fmt.Print("正在连接... ")
+			fmt.Print("Connecting... ")
 		}
 
 		resp, err := client.Do(req)
@@ -156,23 +240,23 @@ var pingCmd = &cobra.Command{
 
 			// 先检查超时情况
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				errMsg = fmt.Sprintf("请求超时 (超过 %ds)", int(timeout.Seconds()))
+				errMsg = fmt.Sprintf("Request timed out (more than %ds)", int(timeout.Seconds()))
 			} else if strings.Contains(errStr, "connection refused") {
-				errMsg = "连接被拒绝 (服务器未监听该端口)"
+				errMsg = "Connection refused (server not listening on this port)"
 			} else if strings.Contains(errStr, "network is unreachable") {
-				errMsg = "网络不可达"
+				errMsg = "Network unreachable"
 			} else if strings.Contains(errStr, "EOF") {
-				errMsg = "连接异常关闭 (服务器可能不存在或无响应)"
+				errMsg = "Connection closed unexpectedly (server may not exist or be unresponsive)"
 			} else if strings.Contains(errStr, "no such host") || strings.Contains(errStr, "NXDOMAIN") {
-				errMsg = "DNS解析失败 (域名不存在或网络配置错误)"
+				errMsg = "DNS resolution failed (domain does not exist or network configuration error)"
 			} else if strings.Contains(errStr, "invalid URL") || strings.Contains(errStr, "parse error") {
-				errMsg = "无效的URL格式"
+				errMsg = "Invalid URL format"
 			} else {
-				// 其他网络错误
+				// Other network errors
 				if netErr, ok := err.(net.Error); ok {
-					errMsg = fmt.Sprintf("网络错误: %v", netErr)
+					errMsg = fmt.Sprintf("Network error: %v", netErr)
 				} else {
-					errMsg = fmt.Sprintf("请求失败: %v", err)
+					errMsg = fmt.Sprintf("Request failed: %v", err)
 				}
 			}
 
@@ -184,7 +268,7 @@ var pingCmd = &cobra.Command{
 				})
 				fmt.Println(string(errData))
 			} else {
-				fmt.Fprintf(os.Stderr, "❌ 连通失败: %s\n", errMsg)
+				fmt.Fprintf(os.Stderr, "❌ Connection failed: %s\n", errMsg)
 			}
 			os.Exit(1)
 		}
@@ -192,19 +276,19 @@ var pingCmd = &cobra.Command{
 
 		duration := time.Since(start)
 
-		// 清除进度指示器
+		// Clear progress indicator
 		if !outputJSON {
 			fmt.Printf("\r")
 		}
 
-		// 输出结果
+		// Output result
 		isSuccess := resp.StatusCode >= 200 && resp.StatusCode < 300
 		if outputJSON {
 			result := map[string]interface{}{
-				"url":           baseURL,
+				"url":           finalURL,
 				"statusCode":    resp.StatusCode,
 				"statusText":    http.StatusText(resp.StatusCode),
-				"requestMethod": requestMethod,
+				"requestMethod": req.Method,
 				"durationMs":    duration.Milliseconds(),
 				"timeoutMs":     timeout.Milliseconds(),
 				"success":       isSuccess,
@@ -212,16 +296,19 @@ var pingCmd = &cobra.Command{
 			data, _ := json.MarshalIndent(result, "", "  ")
 			fmt.Println(string(data))
 		} else {
-			fmt.Printf("✅ 连通成功! \n")
-			fmt.Printf("   URL: %s\n", baseURL)
-			fmt.Printf("   方法: %s\n", requestMethod)
-			fmt.Printf("   状态码: %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
-			fmt.Printf("   响应时间: %dms\n", duration.Milliseconds())
-			fmt.Printf("   超时设置: %s\n", timeout)
+			fmt.Printf("✅ Connection successful! \n")
+			fmt.Printf("   URL: %s\n", finalURL)
+			fmt.Printf("   Method: %s\n", req.Method)
+			fmt.Printf("   Status Code: %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
+			fmt.Printf("   Response Time: %dms\n", duration.Milliseconds())
+			fmt.Printf("   Timeout Setting: %s\n", timeout)
 
-			// 提供额外提示
+			// Provide additional tips
 			if !isSuccess {
-				fmt.Printf("⚠️  注意: 服务器返回非成功状态码\n")
+				fmt.Printf("⚠️  Note: Server returned non-success status code\n")
+				fmt.Printf("   - This is usually because the API's base URL doesn't support simple HEAD/GET requests\n")
+				fmt.Printf("   - But the API's core functionality may still be available (e.g., POST requests used by ClaudeCode)\n")
+				fmt.Printf("   - Try using this configuration in actual scenarios\n")
 			}
 		}
 	},
@@ -229,9 +316,11 @@ var pingCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(pingCmd)
-	// 定义flag并绑定到变量
-	pingCmd.Flags().StringVarP(&customURL, "url", "u", "", "测试自定义URL")
-	pingCmd.Flags().BoolVarP(&outputJSON, "json", "j", false, "JSON格式输出")
-	pingCmd.Flags().StringVarP(&requestMethod, "method", "X", "HEAD", "请求方法")
-	pingCmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "请求超时时间")
+	// Define flag and bind to variable
+	pingCmd.Flags().StringVarP(&customURL, "url", "u", "", "Test custom URL")
+	pingCmd.Flags().BoolVarP(&outputJSON, "json", "j", false, "JSON format output")
+	pingCmd.Flags().StringVarP(&requestMethod, "method", "X", "HEAD", "Request method")
+	pingCmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "Request timeout")
+	pingCmd.Flags().BoolVarP(&testRealAPI, "test", "T", false, "Test real API functionality (simulate ClaudeCode usage)")
+	pingCmd.Flags().StringVarP(&apiPath, "path", "p", "", "Custom path for real API testing (e.g.: /chat/completions)")
 }

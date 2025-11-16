@@ -18,26 +18,26 @@ func init() {
 
 var syncCmd = &cobra.Command{
 	Use:   "sync [subcommand]",
-	Short: "同步配置到各种工具",
-	Long: `同步当前激活的配置到各种工具
+	Short: "Sync configuration to various tools",
+	Long: `Sync current active configuration to various tools
 
-子命令:
-  status     查看同步状态
-  claude     同步到 Claude Code
-  init       为项目初始化工具配置文件
-  list       列出所有可同步的工具`,
+Subcommands:
+  status     View sync status
+  claude     Sync to Claude Code
+  init       Initialize tool configuration files for project
+  list       List all tools that can be synced`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		// 默认显示状态
+		// Default to show status
 		showSyncStatus()
 	},
 }
 
-// status 子命令
+// status subcommand
 var syncStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "查看同步状态",
-	Long:  `查看当前配置同步到各工具的状态`,
+	Short: "View sync status",
+	Long:  `View current configuration sync status to various tools`,
 	Run:   runSyncStatus,
 }
 
@@ -45,11 +45,11 @@ func init() {
 	syncCmd.AddCommand(syncStatusCmd)
 }
 
-// claude 子命令
+// claude subcommand
 var syncClaudeCmd = &cobra.Command{
 	Use:   "claude",
-	Short: "同步到 Claude Code",
-	Long:  `强制同步当前激活的配置到 Claude Code`,
+	Short: "Sync to Claude Code",
+	Long:  `Force sync current active configuration to Claude Code`,
 	Run:   runSyncClaude,
 }
 
@@ -57,11 +57,11 @@ func init() {
 	syncCmd.AddCommand(syncClaudeCmd)
 }
 
-// init 子命令
+// init subcommand
 var syncInitCmd = &cobra.Command{
 	Use:   "init",
-	Short: "为项目初始化工具配置文件",
-	Long:  `在当前项目目录创建各种工具的配置文件模板`,
+	Short: "Initialize tool configuration files for project",
+	Long:  `Create configuration file templates for various tools in the current project directory`,
 	Run:   runSyncInit,
 }
 
@@ -69,11 +69,11 @@ func init() {
 	syncCmd.AddCommand(syncInitCmd)
 }
 
-// list 子命令
+// list subcommand
 var syncListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出所有可同步的工具",
-	Long:  `显示所有支持自动同步的工具列表`,
+	Short: "List all tools that can be synced",
+	Long:  `Show list of all tools that support automatic sync`,
 	Run:   runSyncList,
 }
 
@@ -83,41 +83,41 @@ func init() {
 
 func showSyncStatus() {
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("配置同步状态")
+	fmt.Println("Configuration Sync Status")
 	fmt.Println(strings.Repeat("=", 60))
 
 	configManager := config.NewConfigManager()
 
-	// 显示当前激活配置
+	// Show current active configuration
 	active, err := configManager.GetActive()
 	if err != nil {
-		fmt.Println("\n❌ 没有活动配置")
+		fmt.Println("\n❌ No active configuration")
 		return
 	}
 
-	fmt.Printf("\n当前配置: %s\n", active.Alias)
-	fmt.Printf("模型: %s\n", active.Model)
+	fmt.Printf("\nCurrent configuration: %s\n", active.Alias)
+	fmt.Printf("Model: %s\n", active.Model)
 	fmt.Printf("API Key: %s\n", utils.MaskAPIKey(active.APIKey))
 	fmt.Printf("Base URL: %s\n", active.BaseURL)
 
-	// 检查同步状态
-	fmt.Println("\n同步状态:")
+	// Check sync status
+	fmt.Println("\nSync status:")
 
-	// 全局 Claude Code
+	// Global Claude Code
 	globalClaudePath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 	if _, err := os.Stat(globalClaudePath); err == nil {
-		fmt.Println("✅ Claude Code (全局): ~/.claude/settings.json")
+		fmt.Println("✅ Claude Code (Global): ~/.claude/settings.json")
 	} else {
-		fmt.Println("⚪ Claude Code (全局): 未安装")
+		fmt.Println("⚪ Claude Code (Global): Not installed")
 	}
 
-	// 项目级 Claude Code
+	// Project-level Claude Code
 	workDir, _ := os.Getwd()
 	projectClaudePath := filepath.Join(workDir, ".claude", "settings.json")
 	if _, err := os.Stat(projectClaudePath); err == nil {
-		fmt.Printf("✅ Claude Code (项目): %s\n", projectClaudePath)
+		fmt.Printf("✅ Claude Code (Project): %s\n", projectClaudePath)
 	} else {
-		fmt.Printf("⚪ Claude Code (项目): %s (未初始化)\n", projectClaudePath)
+		fmt.Printf("⚪ Claude Code (Project): %s (Not initialized)\n", projectClaudePath)
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 60))
@@ -132,38 +132,38 @@ func runSyncClaude(cmd *cobra.Command, args []string) {
 
 	_, err := configManager.GetActive()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("正在同步到 Claude Code...")
+	fmt.Println("Syncing to Claude Code...")
 
-	// 同步全局设置
+	// Sync global settings
 	if err := configManager.GenerateActiveScript(); err != nil {
-		fmt.Fprintf(os.Stderr, "错误: 同步失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Sync failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("\n✅ 同步完成!")
+	fmt.Println("\n✅ Sync completed!")
 }
 
 func runSyncInit(cmd *cobra.Command, args []string) {
 	workDir, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "错误: 获取当前目录失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to get current directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("正在为项目初始化工具配置文件...")
+	fmt.Println("Initializing tool configuration files for project...")
 
-	// 创建 .claude 目录（如果不存在）
+	// Create .claude directory (if it doesn't exist)
 	claudeDir := filepath.Join(workDir, ".claude")
 	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "错误: 创建 .claude 目录失败: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to create .claude directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 创建 Claude Code 配置文件
+	// Create Claude Code configuration file
 	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
 		settings := map[string]interface{}{
@@ -179,22 +179,22 @@ func runSyncInit(cmd *cobra.Command, args []string) {
 		}
 
 		if err := writeJSONFile(claudeSettingsPath, settings); err != nil {
-			fmt.Fprintf(os.Stderr, "错误: 创建 Claude Code 配置文件失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to create Claude Code configuration file: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ 创建 Claude Code 配置: %s\n", claudeSettingsPath)
+		fmt.Printf("✅ Created Claude Code configuration: %s\n", claudeSettingsPath)
 	} else {
-		fmt.Printf("ℹ️  Claude Code 配置已存在: %s\n", claudeSettingsPath)
+		fmt.Printf("ℹ️  Claude Code configuration already exists: %s\n", claudeSettingsPath)
 	}
 
-	fmt.Println("\n✅ 项目初始化完成!")
-	fmt.Println("\n现在 apimgr 会自动同步配置到此项目。")
+	fmt.Println("\n✅ Project initialization completed!")
+	fmt.Println("\napimgr will now automatically sync configuration to this project.")
 }
 
 func runSyncList(cmd *cobra.Command, args []string) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("支持同步的工具")
+	fmt.Println("Supported Sync Tools")
 	fmt.Println(strings.Repeat("=", 60))
 
 	tools := []struct {
@@ -202,10 +202,10 @@ func runSyncList(cmd *cobra.Command, args []string) {
 		Config string
 		Status string
 	}{
-		{"Claude Code", "~/.claude/settings.json", "✅ 已实现"},
-		{"Grok (xAI)", "~/.config/grok/config.json", "🚧 规划中"},
-		{"GitHub Copilot", "~/.config/copilot/config.json", "🚧 规划中"},
-		{"OpenAI CLI", "~/.config/openai/config.json", "🚧 规划中"},
+		{"Claude Code", "~/.claude/settings.json", "✅ Implemented"},
+		{"Grok (xAI)", "~/.config/grok/config.json", "🚧 Planned"},
+		{"GitHub Copilot", "~/.config/copilot/config.json", "🚧 Planned"},
+		{"OpenAI CLI", "~/.config/openai/config.json", "🚧 Planned"},
 	}
 
 	fmt.Println()
@@ -216,7 +216,7 @@ func runSyncList(cmd *cobra.Command, args []string) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 }
 
-// writeJSONFile 写入 JSON 文件
+// writeJSONFile writes JSON file
 func writeJSONFile(path string, data interface{}) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
