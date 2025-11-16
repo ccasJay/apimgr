@@ -75,13 +75,13 @@ apimgr remove     # Remove a configuration
 
 ## Documentation
 
-- [Quick Start Guide](QUICKSTART.en.md)
-- [Contribution Guide](CONTRIBUTING.en.md)
-- [Code of Conduct](CODE_OF_CONDUCT.en.md)
+- [Quick Start Guide](QUICKSTART.md)
+- [Contribution Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Contributing
 
-Please read [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for details on our code of conduct and development process.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and development process.
 
 ## License
 
