@@ -1,5 +1,7 @@
 # API Manager (apimgr)
 
+[English version](README.en.md)
+
 一个用 Go 语言开发的命令行工具，用于管理 Anthropic API 密钥和模型配置的快速切换。
 
 ## ✨ 特性

@@ -16,6 +16,10 @@ apimgr
 # Test binary, built with `go test -c`
 *.test
 
+# Goreleaser构建产物
+/dist/
+.DS_Store
+
 # Output of the go coverage tool
 *.out
 
