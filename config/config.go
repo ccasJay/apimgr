@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
+
+	"apimgr/internal/providers"
+	"apimgr/internal/utils"
 )
 
 // APIConfig represents a single API configuration
 type APIConfig struct {
 	Alias     string `json:"alias"`
+	Provider  string `json:"provider"` // API提供商类型
 	APIKey    string `json:"api_key"`
 	AuthToken string `json:"auth_token"`
 	BaseURL   string `json:"base_url"`
@@ -267,6 +270,11 @@ func (cm *ConfigManager) Save(configs []APIConfig) error {
 
 // Add adds a new configuration
 func (cm *ConfigManager) Add(config APIConfig) error {
+	// 设置默认提供商
+	if config.Provider == "" {
+		config.Provider = "anthropic"
+	}
+
 	if err := cm.validateConfig(config); err != nil {
 		return err
 	}
@@ -414,13 +422,31 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 		return fmt.Errorf("别名不能为空")
 	}
 
+	// 默认提供商为anthropic
+	providerName := config.Provider
+	if providerName == "" {
+		providerName = "anthropic"
+	}
+
 	// 至少需要一种认证方式
 	if config.APIKey == "" && config.AuthToken == "" {
 		return fmt.Errorf("API密钥和认证令牌不能同时为空")
 	}
 
+	// 验证提供商
+	provider, err := providers.Get(providerName)
+	if err != nil {
+		return fmt.Errorf("未知的API提供商: %s", providerName)
+	}
+
+	// 提供商特定验证
+	if err := provider.ValidateConfig(config.BaseURL, config.APIKey, config.AuthToken); err != nil {
+		return err
+	}
+
+	// URL格式验证
 	if config.BaseURL != "" {
-		if !isValidURL(config.BaseURL) {
+		if !utils.ValidateURL(config.BaseURL) {
 			return fmt.Errorf("无效的URL格式: %s", config.BaseURL)
 		}
 	}
@@ -428,11 +454,6 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 	return nil
 }
 
-// isValidURL checks if a string is a valid URL
-func isValidURL(u string) bool {
-	_, err := url.ParseRequestURI(u)
-	return err == nil
-}
 
 // UpdatePartial updates only the specified fields of a configuration
 func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) error {
