@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 
 	"apimgr/internal/providers"
 	"apimgr/internal/utils"
@@ -113,7 +112,7 @@ func migrateConfig(oldPath, newPath string) error {
 	}
 
 	// Lock the new config file exclusively
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := lockFileExclusive(file); err != nil {
 		file.Close()
 		return fmt.Errorf("锁定新配置文件失败: %v", err)
 	}
@@ -132,7 +131,7 @@ func migrateConfig(oldPath, newPath string) error {
 	}
 
 	// Unlock and close
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_UN); err != nil {
+	if err := unlockFile(file); err != nil {
 		file.Close()
 		return fmt.Errorf("解锁新配置文件失败: %v", err)
 	}
@@ -247,17 +246,17 @@ func (cm *Manager) saveConfigFile(configFile *File) error {
 
 // lockFile locks the config file with exclusive lock (for write operations)
 func (cm *Manager) lockFile(file *os.File) error {
-	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX)
+	return lockFileExclusive(file)
 }
 
 // lockFileShared locks the config file with shared lock (for read operations)
 func (cm *Manager) lockFileShared(file *os.File) error {
-	return syscall.Flock(int(file.Fd()), syscall.LOCK_SH)
+	return lockFileShared(file)
 }
 
 // unlockFile unlocks the config file
 func (cm *Manager) unlockFile(file *os.File) error {
-	return syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	return unlockFile(file)
 }
 
 // Load loads all configurations from the config file
