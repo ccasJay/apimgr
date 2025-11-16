@@ -4,16 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
+
+	"apimgr/internal/providers"
+	"apimgr/internal/utils"
 )
 
 // APIConfig represents a single API configuration
 type APIConfig struct {
 	Alias     string `json:"alias"`
+	Provider  string `json:"provider"` // API提供商类型
 	APIKey    string `json:"api_key"`
 	AuthToken string `json:"auth_token"`
 	BaseURL   string `json:"base_url"`
@@ -29,6 +33,7 @@ type ConfigFile struct {
 // ConfigManager manages API configurations
 type ConfigManager struct {
 	configPath string
+	mu         sync.Mutex // 互斥锁，保护并发访问
 }
 
 // NewConfigManager creates a new ConfigManager with unified config path
@@ -38,8 +43,15 @@ func NewConfigManager() *ConfigManager {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
+	// Check XDG_CONFIG_HOME environment variable for custom config location
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		// Use default XDG path (~/.config)
+		xdgConfigHome = filepath.Join(homeDir, ".config")
+	}
+
 	// Always use XDG config location (new standard)
-	xdgConfigPath := filepath.Join(homeDir, ".config", "apimgr", "config.json")
+	xdgConfigPath := filepath.Join(xdgConfigHome, "apimgr", "config.json")
 	oldConfigPath := filepath.Join(homeDir, ".apimgr.json")
 
 	configPath := xdgConfigPath
@@ -240,6 +252,9 @@ func (cm *ConfigManager) unlockFile(file *os.File) error {
 
 // Load loads all configurations from the config file
 func (cm *ConfigManager) Load() ([]APIConfig, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return nil, err
@@ -249,6 +264,9 @@ func (cm *ConfigManager) Load() ([]APIConfig, error) {
 
 // Save saves configurations to the config file
 func (cm *ConfigManager) Save(configs []APIConfig) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return err
@@ -259,38 +277,53 @@ func (cm *ConfigManager) Save(configs []APIConfig) error {
 
 // Add adds a new configuration
 func (cm *ConfigManager) Add(config APIConfig) error {
+	// 设置默认提供商
+	if config.Provider == "" {
+		config.Provider = "anthropic"
+	}
+
 	if err := cm.validateConfig(config); err != nil {
 		return err
 	}
 
-	configs, err := cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configs, err := cm.loadConfigFile()
 	if err != nil {
 		return err
 	}
 
 	// Check if alias already exists
-	for i, existingConfig := range configs {
+	for i, existingConfig := range configs.Configs {
 		if existingConfig.Alias == config.Alias {
-			configs[i] = config
-			return cm.Save(configs)
+			configs.Configs[i] = config
+			return cm.saveConfigFile(configs)
 		}
 	}
 
-	configs = append(configs, config)
-	return cm.Save(configs)
+	configs.Configs = append(configs.Configs, config)
+	return cm.saveConfigFile(configs)
 }
 
 // Remove removes a configuration by alias
 func (cm *ConfigManager) Remove(alias string) error {
-	configs, err := cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configs, err := cm.loadConfigFile()
 	if err != nil {
 		return err
 	}
 
-	for i, config := range configs {
+	for i, config := range configs.Configs {
 		if config.Alias == alias {
-			configs = append(configs[:i], configs[i+1:]...)
-			return cm.Save(configs)
+			configs.Configs = append(configs.Configs[:i], configs.Configs[i+1:]...)
+			// 如果移除的是活动配置，则清空活动配置
+			if configs.Active == alias {
+				configs.Active = ""
+			}
+			return cm.saveConfigFile(configs)
 		}
 	}
 
@@ -299,12 +332,15 @@ func (cm *ConfigManager) Remove(alias string) error {
 
 // Get returns a configuration by alias
 func (cm *ConfigManager) Get(alias string) (*APIConfig, error) {
-	configs, err := cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configs, err := cm.loadConfigFile()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, config := range configs {
+	for _, config := range configs.Configs {
 		if config.Alias == alias {
 			return &config, nil
 		}
@@ -315,11 +351,21 @@ func (cm *ConfigManager) Get(alias string) (*APIConfig, error) {
 
 // List returns all configurations
 func (cm *ConfigManager) List() ([]APIConfig, error) {
-	return cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configs, err := cm.loadConfigFile()
+	if err != nil {
+		return nil, err
+	}
+	return configs.Configs, nil
 }
 
 // SetActive sets the active configuration
 func (cm *ConfigManager) SetActive(alias string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return err
@@ -344,6 +390,9 @@ func (cm *ConfigManager) SetActive(alias string) error {
 
 // GetActive returns the active configuration
 func (cm *ConfigManager) GetActive() (*APIConfig, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return nil, err
@@ -364,6 +413,9 @@ func (cm *ConfigManager) GetActive() (*APIConfig, error) {
 
 // GetActiveName returns the active configuration name
 func (cm *ConfigManager) GetActiveName() (string, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return "", err
@@ -377,13 +429,31 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 		return fmt.Errorf("别名不能为空")
 	}
 
+	// 默认提供商为anthropic
+	providerName := config.Provider
+	if providerName == "" {
+		providerName = "anthropic"
+	}
+
 	// 至少需要一种认证方式
 	if config.APIKey == "" && config.AuthToken == "" {
 		return fmt.Errorf("API密钥和认证令牌不能同时为空")
 	}
 
+	// 验证提供商
+	provider, err := providers.Get(providerName)
+	if err != nil {
+		return fmt.Errorf("未知的API提供商: %s", providerName)
+	}
+
+	// 提供商特定验证
+	if err := provider.ValidateConfig(config.BaseURL, config.APIKey, config.AuthToken); err != nil {
+		return err
+	}
+
+	// URL格式验证
 	if config.BaseURL != "" {
-		if !isValidURL(config.BaseURL) {
+		if !utils.ValidateURL(config.BaseURL) {
 			return fmt.Errorf("无效的URL格式: %s", config.BaseURL)
 		}
 	}
@@ -391,41 +461,39 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 	return nil
 }
 
-// isValidURL checks if a string is a valid URL
-func isValidURL(u string) bool {
-	_, err := url.ParseRequestURI(u)
-	return err == nil
-}
 
 // UpdatePartial updates only the specified fields of a configuration
 func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) error {
-	configs, err := cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return err
 	}
 
-	for i, config := range configs {
+	for i, config := range configFile.Configs {
 		if config.Alias == alias {
 			// Update only the fields that are provided
 			if apiKey, ok := updates["api_key"]; ok {
-				configs[i].APIKey = apiKey
+				configFile.Configs[i].APIKey = apiKey
 			}
 			if authToken, ok := updates["auth_token"]; ok {
-				configs[i].AuthToken = authToken
+				configFile.Configs[i].AuthToken = authToken
 			}
 			if baseURL, ok := updates["base_url"]; ok {
-				configs[i].BaseURL = baseURL
+				configFile.Configs[i].BaseURL = baseURL
 			}
 			if model, ok := updates["model"]; ok {
-				configs[i].Model = model
+				configFile.Configs[i].Model = model
 			}
 
 			// Validate the updated config
-			if err := cm.validateConfig(configs[i]); err != nil {
+			if err := cm.validateConfig(configFile.Configs[i]); err != nil {
 				return err
 			}
 
-			return cm.Save(configs)
+			return cm.saveConfigFile(configFile)
 		}
 	}
 
@@ -434,41 +502,67 @@ func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) 
 
 // RenameAlias renames a configuration alias
 func (cm *ConfigManager) RenameAlias(oldAlias, newAlias string) error {
-	configs, err := cm.Load()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		return err
 	}
 
 	// Check if new alias already exists
-	for _, cfg := range configs {
+	for _, cfg := range configFile.Configs {
 		if cfg.Alias == newAlias {
 			return fmt.Errorf("配置 '%s' 已存在", newAlias)
 		}
 	}
 
 	// Find and rename
-	for i, cfg := range configs {
+	found := false
+	for i, cfg := range configFile.Configs {
 		if cfg.Alias == oldAlias {
-			configs[i].Alias = newAlias
-
-			// Update active config if needed
-			configFile, err := cm.loadConfigFile()
-			if err == nil && configFile.Active == oldAlias {
-				configFile.Active = newAlias
-				cm.saveConfigFile(configFile)
-			}
-
-			return cm.Save(configs)
+			configFile.Configs[i].Alias = newAlias
+			found = true
+			break
 		}
 	}
 
-	return fmt.Errorf("配置 '%s' 不存在", oldAlias)
+	if !found {
+		return fmt.Errorf("配置 '%s' 不存在", oldAlias)
+	}
+
+	// Update active config if needed
+	if configFile.Active == oldAlias {
+		configFile.Active = newAlias
+	}
+
+	return cm.saveConfigFile(configFile)
 }
 
 // GenerateActiveScript 生成活动配置的激活脚本
 func (cm *ConfigManager) GenerateActiveScript() error {
-	active, err := cm.GetActive()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
 	if err != nil {
+		// 没有活动配置，清理 active.env 文件
+		activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
+		os.Remove(activeEnvPath)
+		return nil
+	}
+
+	var active *APIConfig
+	if configFile.Active != "" {
+		for _, config := range configFile.Configs {
+			if config.Alias == configFile.Active {
+				active = &config
+				break
+			}
+		}
+	}
+
+	if active == nil {
 		// 没有活动配置，清理 active.env 文件
 		activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
 		os.Remove(activeEnvPath)

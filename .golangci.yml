@@ -1,0 +1,38 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs: []
+
+linters:
+  enable-all: false
+  enable:
+    - gofmt
+    - golint
+    - gosec
+    - staticcheck
+    - vet
+    - errcheck
+    - unused
+    - misspell
+    - gocritic
+    - gocyclo
+    - dupl
+
+linter-settings:
+  gofmt:
+    simplify: true
+  gocyclo:
+    min-complexity: 15
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - CommentFormatting
+      - ContextualShadow
+  gosec:
+    excludes:
+      - G104 # Binding to all interfaces
+  staticcheck:
+    checks: ["SA1*", "SA2*", "SA3*", "SA4*", "SA5*"]
