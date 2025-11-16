@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
+	"github.com/spf13/cobra"
 )
 
 // APIConfigBuilder 负责构建和验证 APIConfig
@@ -100,17 +100,18 @@ func (ic *InputCollector) CollectInteractively(presetType string) (*config.APICo
 	var apiKey, authToken, url, model string
 
 	// 根据预设类型处理
-	if presetType == "api_key" {
+	switch presetType {
+	case "api_key":
 		// API密钥已通过命令行提供
 		fmt.Print("请输入认证令牌 (可选): ")
 		authToken, _ = reader.ReadString('\n')
 		authToken = strings.TrimSpace(authToken)
-	} else if presetType == "auth_token" {
+	case "auth_token":
 		// 认证令牌已通过命令行提供
 		fmt.Print("请输入API密钥 (可选): ")
 		apiKey, _ = reader.ReadString('\n')
 		apiKey = strings.TrimSpace(apiKey)
-	} else {
+	default:
 		// 完全交互式
 		fmt.Print("请输入API密钥 (可选，与auth token二选一): ")
 		apiKey, _ = reader.ReadString('\n')

@@ -223,5 +223,5 @@ func writeJSONFile(path string, data interface{}) error {
 		return err
 	}
 
-	return os.WriteFile(path, jsonData, 0644)
+	return os.WriteFile(path, jsonData, 0600)
 }

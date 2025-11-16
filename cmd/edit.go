@@ -107,10 +107,15 @@ var editCmd = &cobra.Command{
 type FieldType int
 
 const (
+	// FieldAlias represents the alias field
 	FieldAlias FieldType = iota
+	// FieldAPIKey represents the API key field
 	FieldAPIKey
+	// FieldAuthToken represents the auth token field
 	FieldAuthToken
+	// FieldBaseURL represents the base URL field
 	FieldBaseURL
+	// FieldModel represents the model field
 	FieldModel
 )
 
@@ -405,10 +410,9 @@ func getOtherAuthValue(fieldType FieldType, config *config.APIConfig, newValue s
 	if fieldType == FieldAPIKey {
 		// After update, api_key will be newValue, check if auth_token is set
 		return config.AuthToken
-	} else {
-		// After update, auth_token will be newValue, check if api_key is set
-		return config.APIKey
 	}
+	// After update, auth_token will be newValue, check if api_key is set
+	return config.APIKey
 }
 
 func previewChanges(currentConfig config.APIConfig, updates map[string]string) {

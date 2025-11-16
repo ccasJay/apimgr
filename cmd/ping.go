@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"apimgr/config"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -100,9 +100,9 @@ var pingCmd = &cobra.Command{
 		client := &http.Client{
 			Timeout: timeout,
 			Transport: &http.Transport{
-				MaxIdleConns:        10,          // 最大空闲连接数
-				IdleConnTimeout:     30 * time.Second, // 空闲连接超时
-				TLSHandshakeTimeout: 5 * time.Second,  // TLS握手超时
+				MaxIdleConns:          10,               // 最大空闲连接数
+				IdleConnTimeout:       30 * time.Second, // 空闲连接超时
+				TLSHandshakeTimeout:   5 * time.Second,  // TLS握手超时
 				ExpectContinueTimeout: 1 * time.Second,
 			},
 		}
@@ -111,9 +111,9 @@ var pingCmd = &cobra.Command{
 		if !isValidURL(baseURL) {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error":     "无效的URL格式",
-					"url":       baseURL,
-					"success":   false,
+					"error":   "无效的URL格式",
+					"url":     baseURL,
+					"success": false,
 				})
 				fmt.Println(string(errData))
 			} else {
@@ -128,9 +128,9 @@ var pingCmd = &cobra.Command{
 		if err != nil {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error":     "创建请求失败",
-					"message":   err.Error(),
-					"success":   false,
+					"error":   "创建请求失败",
+					"message": err.Error(),
+					"success": false,
 				})
 				fmt.Println(string(errData))
 			} else {
@@ -178,9 +178,9 @@ var pingCmd = &cobra.Command{
 
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error":     errMsg,
-					"url":       baseURL,
-					"success":   false,
+					"error":   errMsg,
+					"url":     baseURL,
+					"success": false,
 				})
 				fmt.Println(string(errData))
 			} else {
@@ -235,4 +235,3 @@ func init() {
 	pingCmd.Flags().StringVarP(&requestMethod, "method", "X", "HEAD", "请求方法")
 	pingCmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "请求超时时间")
 }
-

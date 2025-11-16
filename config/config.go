@@ -58,7 +58,9 @@ func NewConfigManager() *ConfigManager {
 
 	// Ensure XDG directory exists
 	configDir := filepath.Dir(xdgConfigPath)
-	os.MkdirAll(configDir, 0755)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		panic(fmt.Sprintf("无法创建配置目录: %v", err))
+	}
 
 	// Migrate from old config if it exists and new config doesn't
 	if shouldMigrateConfig(oldConfigPath, xdgConfigPath) {
@@ -175,7 +177,11 @@ func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
 	if err := cm.lockFileShared(file); err != nil {
 		return nil, fmt.Errorf("锁定配置文件失败: %v", err)
 	}
-	defer cm.unlockFile(file)
+	defer func() {
+		if err := cm.unlockFile(file); err != nil {
+			fmt.Printf("⚠️  解锁文件失败: %v\n", err)
+		}
+	}()
 
 	// Read from the locked file descriptor instead of using os.ReadFile
 	data, err := io.ReadAll(file)
@@ -219,7 +225,11 @@ func (cm *ConfigManager) saveConfigFile(configFile *ConfigFile) error {
 	if err := cm.lockFile(file); err != nil {
 		return fmt.Errorf("锁定配置文件失败: %v", err)
 	}
-	defer cm.unlockFile(file)
+	defer func() {
+		if err := cm.unlockFile(file); err != nil {
+			fmt.Printf("⚠️  解锁文件失败: %v\n", err)
+		}
+	}()
 
 	// Write the file while holding the lock
 	_, err = file.Write(data)
@@ -461,7 +471,6 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 	return nil
 }
 
-
 // UpdatePartial updates only the specified fields of a configuration
 func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) error {
 	cm.mu.Lock()
@@ -556,7 +565,9 @@ func (cm *ConfigManager) GenerateActiveScript() error {
 	if configFile.Active != "" {
 		for _, config := range configFile.Configs {
 			if config.Alias == configFile.Active {
-				active = &config
+				// Create a copy to avoid implicit memory aliasing
+				activeCopy := config
+				active = &activeCopy
 				break
 			}
 		}
@@ -574,7 +585,7 @@ func (cm *ConfigManager) GenerateActiveScript() error {
 
 	// 写入文件
 	activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
-	if err := os.WriteFile(activeEnvPath, []byte(envScript), 0644); err != nil {
+	if err := os.WriteFile(activeEnvPath, []byte(envScript), 0600); err != nil {
 		return err
 	}
 
@@ -586,6 +597,7 @@ func (cm *ConfigManager) GenerateActiveScript() error {
 	// 同步到项目级配置文件（如果存在 .claude 目录）
 	if syncErr := cm.syncProjectClaudeConfig(active); syncErr != nil {
 		// 项目级同步失败不报错，因为不是所有项目都有 .claude 目录
+		fmt.Printf("⚠️  同步项目级 Claude Code 设置失败: %v\n", syncErr)
 	}
 
 	return nil
@@ -680,7 +692,7 @@ func (cm *ConfigManager) syncClaudeSettings(cfg *APIConfig) error {
 		return fmt.Errorf("序列化全局 Claude Code 设置失败: %v", err)
 	}
 
-	if err := os.WriteFile(claudeSettingsPath, updatedData, 0644); err != nil {
+	if err := os.WriteFile(claudeSettingsPath, updatedData, 0600); err != nil {
 		return fmt.Errorf("写入全局 Claude Code 设置失败: %v", err)
 	}
 
@@ -747,7 +759,7 @@ func (cm *ConfigManager) syncProjectClaudeConfig(cfg *APIConfig) error {
 		return fmt.Errorf("序列化项目级 Claude Code 设置失败: %v", err)
 	}
 
-	if err := os.WriteFile(projectClaudePath, updatedData, 0644); err != nil {
+	if err := os.WriteFile(projectClaudePath, updatedData, 0600); err != nil {
 		return fmt.Errorf("写入项目级 Claude Code 设置失败: %v", err)
 	}
 

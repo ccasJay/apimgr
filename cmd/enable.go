@@ -55,7 +55,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 				os.Exit(1)
 			}
 
-			if err := os.WriteFile(newConfigPath, data, 0644); err != nil {
+			if err := os.WriteFile(newConfigPath, data, 0600); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed to write new config: %v\n", err)
 				os.Exit(1)
 			}
@@ -69,7 +69,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 		// Create empty config if neither exists
 		if _, err := os.Stat(newConfigPath); os.IsNotExist(err) {
 			defaultConfig := `{"active":"","configs":[]}`
-			if err := os.WriteFile(newConfigPath, []byte(defaultConfig), 0644); err != nil {
+			if err := os.WriteFile(newConfigPath, []byte(defaultConfig), 0600); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed to create config file: %v\n", err)
 				os.Exit(1)
 			}

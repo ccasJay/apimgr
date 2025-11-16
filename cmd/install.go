@@ -80,12 +80,11 @@ fi
 						fmt.Printf("✓ 已安装最新版本到 %s\n", rcFile)
 						fmt.Printf("\n提示: 运行 'source %s' 使其生效\n", rcFile)
 						return
-					} else {
-						fmt.Printf("⚠️  检测到旧版本安装\n")
-						fmt.Printf("建议运行 'apimgr install --force' 更新到新版本\n")
-						fmt.Printf("或手动更新 %s 中的 apimgr 配置\n", rcFile)
-						return
 					}
+					fmt.Printf("⚠️  检测到旧版本安装\n")
+					fmt.Printf("建议运行 'apimgr install --force' 更新到新版本\n")
+					fmt.Printf("或手动更新 %s 中的 apimgr 配置\n", rcFile)
+					return
 				}
 			}
 		} else {
@@ -130,7 +129,7 @@ fi
 				}
 
 				// Write back the cleaned content
-				err = os.WriteFile(rcFile, []byte(strings.Join(newLines, "\n")), 0644)
+				err = os.WriteFile(rcFile, []byte(strings.Join(newLines, "\n")), 0600)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "错误: 无法更新 %s: %v\n", rcFile, err)
 					os.Exit(1)
@@ -141,7 +140,7 @@ fi
 		}
 
 		// Append to rc file
-		f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: 无法打开 %s: %v\n", rcFile, err)
 			os.Exit(1)

@@ -19,9 +19,9 @@ var statusCmd = &cobra.Command{
 	Long:  "显示当前激活的API配置信息，包括全局配置和当前shell环境",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get shell environment variables
-		shellApiKey := os.Getenv("ANTHROPIC_API_KEY")
+		shellAPIKey := os.Getenv("ANTHROPIC_API_KEY")
 		shellAuthToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
-		shellApiBase := os.Getenv("ANTHROPIC_BASE_URL")
+		shellAPIBase := os.Getenv("ANTHROPIC_BASE_URL")
 		shellModel := os.Getenv("ANTHROPIC_MODEL")
 		shellActiveAlias := os.Getenv("APIMGR_ACTIVE")
 
@@ -58,20 +58,20 @@ var statusCmd = &cobra.Command{
 
 		// Show shell environment configuration
 		fmt.Println("\n2. 当前Shell环境:")
-		if shellApiKey == "" && shellAuthToken == "" {
+		if shellAPIKey == "" && shellAuthToken == "" {
 			fmt.Println("   未设置环境变量")
 		} else {
 			if shellActiveAlias != "" {
 				fmt.Printf("   别名: %s\n", shellActiveAlias)
 			}
-			if shellApiKey != "" {
-				fmt.Printf("   API Key: %s\n", utils.MaskAPIKey(shellApiKey))
+			if shellAPIKey != "" {
+				fmt.Printf("   API Key: %s\n", utils.MaskAPIKey(shellAPIKey))
 			}
 			if shellAuthToken != "" {
 				fmt.Printf("   Auth Token: %s\n", utils.MaskAPIKey(shellAuthToken))
 			}
-			if shellApiBase != "" {
-				fmt.Printf("   Base URL: %s\n", shellApiBase)
+			if shellAPIBase != "" {
+				fmt.Printf("   Base URL: %s\n", shellAPIBase)
 			}
 			if shellModel != "" {
 				fmt.Printf("   Model: %s\n", shellModel)
@@ -80,7 +80,7 @@ var statusCmd = &cobra.Command{
 
 		// Show configuration source
 		fmt.Println("\n=========================================")
-		if shellApiKey != "" || shellAuthToken != "" {
+		if shellAPIKey != "" || shellAuthToken != "" {
 			if globalErr != nil || (globalActiveAlias != "" && globalActiveAlias != shellActiveAlias) {
 				fmt.Println("💡 当前使用的是Shell环境配置 (覆盖了全局配置)")
 			} else {

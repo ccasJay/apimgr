@@ -45,21 +45,25 @@ func List() []string {
 	return list
 }
 
-// 内置提供商：Anthropic
+// AnthropicProvider is the Anthropic API provider implementation
 type AnthropicProvider struct{}
 
+// Name returns the provider name
 func (p *AnthropicProvider) Name() string {
 	return "anthropic"
 }
 
+// DefaultBaseURL returns the default Anthropic API base URL
 func (p *AnthropicProvider) DefaultBaseURL() string {
 	return "https://api.anthropic.com"
 }
 
+// DefaultModel returns the default Anthropic model
 func (p *AnthropicProvider) DefaultModel() string {
 	return "claude-3-sonnet-20240229"
 }
 
+// ValidateConfig validates the Anthropic API configuration
 func (p *AnthropicProvider) ValidateConfig(baseURL, apiKey, authToken string) error {
 	if apiKey == "" && authToken == "" {
 		return fmt.Errorf("anthropic: must provide either API key or auth token")
@@ -67,29 +71,34 @@ func (p *AnthropicProvider) ValidateConfig(baseURL, apiKey, authToken string) er
 	return nil
 }
 
+// NormalizeConfig normalizes the Anthropic API configuration
 func (p *AnthropicProvider) NormalizeConfig(baseURL string) string {
-	// 确保URL以/结尾
+	// Ensure URL ends with trailing slash
 	if baseURL != "" && baseURL[len(baseURL)-1] != '/' {
 		return baseURL + "/"
 	}
 	return baseURL
 }
 
-// 内置提供商：OpenAI
+// OpenAIProvider is the OpenAI API provider implementation
 type OpenAIProvider struct{}
 
+// Name returns the provider name
 func (p *OpenAIProvider) Name() string {
 	return "openai"
 }
 
+// DefaultBaseURL returns the default OpenAI API base URL
 func (p *OpenAIProvider) DefaultBaseURL() string {
 	return "https://api.openai.com/v1"
 }
 
+// DefaultModel returns the default OpenAI model
 func (p *OpenAIProvider) DefaultModel() string {
 	return "gpt-4"
 }
 
+// ValidateConfig validates the OpenAI API configuration
 func (p *OpenAIProvider) ValidateConfig(baseURL, apiKey, authToken string) error {
 	if apiKey == "" {
 		return fmt.Errorf("openai: must provide API key")
@@ -97,6 +106,7 @@ func (p *OpenAIProvider) ValidateConfig(baseURL, apiKey, authToken string) error
 	return nil
 }
 
+// NormalizeConfig normalizes the OpenAI API configuration
 func (p *OpenAIProvider) NormalizeConfig(baseURL string) string {
 	if baseURL != "" && baseURL[len(baseURL)-1] != '/' {
 		return baseURL + "/"
