@@ -37,12 +37,12 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ### Recommended Installation
 #### Go Install
 ```bash
-go install github.com/your-username/apimgr@latest
+go install https://github.com/ccasJay/apimgr.git
 ```
 
 #### From Source
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
 go build
 sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
@@ -50,7 +50,8 @@ sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
 
 #### Using Makefile
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
+
 cd apimgr
 make install  # Builds and installs locally
 # sudo make install  # For system-wide installation
