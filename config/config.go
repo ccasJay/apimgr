@@ -24,20 +24,20 @@ type APIConfig struct {
 	Model     string `json:"model"`
 }
 
-// ConfigFile represents the structure of the config file
-type ConfigFile struct {
+// File represents the structure of the config file
+type File struct {
 	Active  string      `json:"active"`
 	Configs []APIConfig `json:"configs"`
 }
 
-// ConfigManager manages API configurations
-type ConfigManager struct {
+// Manager manages API configurations
+type Manager struct {
 	configPath string
 	mu         sync.Mutex // 互斥锁，保护并发访问
 }
 
-// NewConfigManager creates a new ConfigManager with unified config path
-func NewConfigManager() *ConfigManager {
+// NewConfigManager creates a new Manager with unified config path
+func NewConfigManager() *Manager {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
@@ -72,7 +72,7 @@ func NewConfigManager() *ConfigManager {
 		}
 	}
 
-	return &ConfigManager{
+	return &Manager{
 		configPath: configPath,
 	}
 }
@@ -97,7 +97,7 @@ func migrateConfig(oldPath, newPath string) error {
 	}
 
 	// Validate that it's a valid config
-	var tempConfig ConfigFile
+	var tempConfig File
 	if err := json.Unmarshal(data, &tempConfig); err != nil {
 		// Try old format (array of configs)
 		var tempConfigs []APIConfig
@@ -157,17 +157,17 @@ func fileExists(path string) bool {
 }
 
 // GetConfigPath returns the path to the config file
-func (cm *ConfigManager) GetConfigPath() string {
+func (cm *Manager) GetConfigPath() string {
 	return cm.configPath
 }
 
 // loadConfigFile loads the config file with locking
-func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
+func (cm *Manager) loadConfigFile() (*File, error) {
 	// Open the file with read lock
 	file, err := os.OpenFile(cm.configPath, os.O_RDONLY, 0600)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &ConfigFile{Configs: []APIConfig{}}, nil
+			return &File{Configs: []APIConfig{}}, nil
 		}
 		return nil, fmt.Errorf("打开配置文件失败: %v", err)
 	}
@@ -190,16 +190,16 @@ func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
 	}
 
 	if len(data) == 0 {
-		return &ConfigFile{Configs: []APIConfig{}}, nil
+		return &File{Configs: []APIConfig{}}, nil
 	}
 
-	var configFile ConfigFile
+	var configFile File
 	err = json.Unmarshal(data, &configFile)
 	if err != nil {
 		// Try to parse as old format (array of configs)
 		var configs []APIConfig
 		if err2 := json.Unmarshal(data, &configs); err2 == nil {
-			return &ConfigFile{Configs: configs}, nil
+			return &File{Configs: configs}, nil
 		}
 		return nil, fmt.Errorf("解析配置文件失败: %v", err)
 	}
@@ -208,7 +208,7 @@ func (cm *ConfigManager) loadConfigFile() (*ConfigFile, error) {
 }
 
 // saveConfigFile saves the config file with locking
-func (cm *ConfigManager) saveConfigFile(configFile *ConfigFile) error {
+func (cm *Manager) saveConfigFile(configFile *File) error {
 	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %v", err)
@@ -246,22 +246,22 @@ func (cm *ConfigManager) saveConfigFile(configFile *ConfigFile) error {
 }
 
 // lockFile locks the config file with exclusive lock (for write operations)
-func (cm *ConfigManager) lockFile(file *os.File) error {
+func (cm *Manager) lockFile(file *os.File) error {
 	return syscall.Flock(int(file.Fd()), syscall.LOCK_EX)
 }
 
 // lockFileShared locks the config file with shared lock (for read operations)
-func (cm *ConfigManager) lockFileShared(file *os.File) error {
+func (cm *Manager) lockFileShared(file *os.File) error {
 	return syscall.Flock(int(file.Fd()), syscall.LOCK_SH)
 }
 
 // unlockFile unlocks the config file
-func (cm *ConfigManager) unlockFile(file *os.File) error {
+func (cm *Manager) unlockFile(file *os.File) error {
 	return syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 }
 
 // Load loads all configurations from the config file
-func (cm *ConfigManager) Load() ([]APIConfig, error) {
+func (cm *Manager) Load() ([]APIConfig, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -273,7 +273,7 @@ func (cm *ConfigManager) Load() ([]APIConfig, error) {
 }
 
 // Save saves configurations to the config file
-func (cm *ConfigManager) Save(configs []APIConfig) error {
+func (cm *Manager) Save(configs []APIConfig) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -286,7 +286,7 @@ func (cm *ConfigManager) Save(configs []APIConfig) error {
 }
 
 // Add adds a new configuration
-func (cm *ConfigManager) Add(config APIConfig) error {
+func (cm *Manager) Add(config APIConfig) error {
 	// 设置默认提供商
 	if config.Provider == "" {
 		config.Provider = "anthropic"
@@ -317,7 +317,7 @@ func (cm *ConfigManager) Add(config APIConfig) error {
 }
 
 // Remove removes a configuration by alias
-func (cm *ConfigManager) Remove(alias string) error {
+func (cm *Manager) Remove(alias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -341,7 +341,7 @@ func (cm *ConfigManager) Remove(alias string) error {
 }
 
 // Get returns a configuration by alias
-func (cm *ConfigManager) Get(alias string) (*APIConfig, error) {
+func (cm *Manager) Get(alias string) (*APIConfig, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -360,7 +360,7 @@ func (cm *ConfigManager) Get(alias string) (*APIConfig, error) {
 }
 
 // List returns all configurations
-func (cm *ConfigManager) List() ([]APIConfig, error) {
+func (cm *Manager) List() ([]APIConfig, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -372,7 +372,7 @@ func (cm *ConfigManager) List() ([]APIConfig, error) {
 }
 
 // SetActive sets the active configuration
-func (cm *ConfigManager) SetActive(alias string) error {
+func (cm *Manager) SetActive(alias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -399,7 +399,7 @@ func (cm *ConfigManager) SetActive(alias string) error {
 }
 
 // GetActive returns the active configuration
-func (cm *ConfigManager) GetActive() (*APIConfig, error) {
+func (cm *Manager) GetActive() (*APIConfig, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -422,7 +422,7 @@ func (cm *ConfigManager) GetActive() (*APIConfig, error) {
 }
 
 // GetActiveName returns the active configuration name
-func (cm *ConfigManager) GetActiveName() (string, error) {
+func (cm *Manager) GetActiveName() (string, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -434,7 +434,7 @@ func (cm *ConfigManager) GetActiveName() (string, error) {
 }
 
 // validateConfig validates a configuration
-func (cm *ConfigManager) validateConfig(config APIConfig) error {
+func (cm *Manager) validateConfig(config APIConfig) error {
 	if config.Alias == "" {
 		return fmt.Errorf("别名不能为空")
 	}
@@ -472,7 +472,7 @@ func (cm *ConfigManager) validateConfig(config APIConfig) error {
 }
 
 // UpdatePartial updates only the specified fields of a configuration
-func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) error {
+func (cm *Manager) UpdatePartial(alias string, updates map[string]string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -510,7 +510,7 @@ func (cm *ConfigManager) UpdatePartial(alias string, updates map[string]string) 
 }
 
 // RenameAlias renames a configuration alias
-func (cm *ConfigManager) RenameAlias(oldAlias, newAlias string) error {
+func (cm *Manager) RenameAlias(oldAlias, newAlias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -549,7 +549,7 @@ func (cm *ConfigManager) RenameAlias(oldAlias, newAlias string) error {
 }
 
 // GenerateActiveScript 生成活动配置的激活脚本
-func (cm *ConfigManager) GenerateActiveScript() error {
+func (cm *Manager) GenerateActiveScript() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -639,7 +639,7 @@ func generateEnvScript(cfg *APIConfig) string {
 }
 
 // syncClaudeSettings 同步配置到全局 Claude Code 设置文件
-func (cm *ConfigManager) syncClaudeSettings(cfg *APIConfig) error {
+func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	// 检查 Claude Code 配置文件是否存在
@@ -700,7 +700,7 @@ func (cm *ConfigManager) syncClaudeSettings(cfg *APIConfig) error {
 }
 
 // syncProjectClaudeConfig 同步配置到项目级 .claude/settings.json
-func (cm *ConfigManager) syncProjectClaudeConfig(cfg *APIConfig) error {
+func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 	// 获取当前工作目录
 	workDir, err := os.Getwd()
 	if err != nil {

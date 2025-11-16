@@ -7,7 +7,7 @@ import (
 
 func TestConfigManager(t *testing.T) {
 	// 创建临时配置管理器用于测试
-	cm := &ConfigManager{configPath: "/tmp/test_apimgr.json"}
+	cm := &Manager{configPath: "/tmp/test_apimgr.json"}
 
 	// 清理测试文件
 	defer os.Remove("/tmp/test_apimgr.json")
@@ -63,7 +63,7 @@ func TestConfigManager(t *testing.T) {
 }
 
 func TestValidateConfig(t *testing.T) {
-	cm := &ConfigManager{configPath: "/tmp/test.json"}
+	cm := &Manager{configPath: "/tmp/test.json"}
 
 	// 测试空别名
 	err := cm.validateConfig(APIConfig{Alias: "", APIKey: "key"})

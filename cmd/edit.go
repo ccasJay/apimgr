@@ -148,7 +148,7 @@ func editConfig(alias string) error {
 }
 
 // collectUserEdits handles the interactive editing loop and returns collected updates
-func collectUserEdits(currentConfig *config.APIConfig, configManager *config.ConfigManager) (map[string]string, error) {
+func collectUserEdits(currentConfig *config.APIConfig, configManager *config.Manager) (map[string]string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	updates := make(map[string]string)
 
@@ -259,7 +259,7 @@ func displayMaskedField(label, value, maskedValue string) {
 	}
 }
 
-func handleFieldSelection(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, choice string, configManager *config.ConfigManager) error {
+func handleFieldSelection(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, choice string, configManager *config.Manager) error {
 	var fieldType FieldType
 	var fieldName string
 
@@ -304,7 +304,7 @@ func handlePreview(currentConfig *config.APIConfig, updates map[string]string) e
 	return nil
 }
 
-func editField(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, fieldType FieldType, fieldName string, configManager *config.ConfigManager) error {
+func editField(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, fieldType FieldType, fieldName string, configManager *config.Manager) error {
 	// Get current value (either from updates or currentConfig)
 	currentValue := getCurrentValue(currentConfig, updates, fieldType)
 	prompt := fmt.Sprintf("\n当前%s: %s\n请输入新%s (回车保持不变): ", fieldName, currentValue, fieldName)
@@ -381,7 +381,7 @@ func isSensitiveField(fieldType FieldType) bool {
 	return fieldType == FieldAPIKey || fieldType == FieldAuthToken
 }
 
-func validateFieldValue(fieldType FieldType, value string, currentConfig *config.APIConfig, configManager *config.ConfigManager) error {
+func validateFieldValue(fieldType FieldType, value string, currentConfig *config.APIConfig, configManager *config.Manager) error {
 	switch fieldType {
 	case FieldAlias:
 		// Check if alias already exists (excluding current config)
@@ -455,7 +455,7 @@ func getUpdatedAlias(originalAlias string, updates map[string]string) string {
 }
 
 // saveAndApplyChanges applies updates to config and regenerates the active script
-func saveAndApplyChanges(configManager *config.ConfigManager, alias string, updates map[string]string) error {
+func saveAndApplyChanges(configManager *config.Manager, alias string, updates map[string]string) error {
 	// Apply field updates
 	if err := applyUpdates(configManager, alias, updates); err != nil {
 		return fmt.Errorf("保存失败: %v", err)
@@ -472,7 +472,7 @@ func saveAndApplyChanges(configManager *config.ConfigManager, alias string, upda
 	return nil
 }
 
-func applyUpdates(configManager *config.ConfigManager, alias string, updates map[string]string) error {
+func applyUpdates(configManager *config.Manager, alias string, updates map[string]string) error {
 	// Handle alias update separately
 	if newAlias, ok := updates["alias"]; ok {
 		if err := configManager.RenameAlias(alias, newAlias); err != nil {
