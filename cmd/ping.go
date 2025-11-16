@@ -156,7 +156,7 @@ var pingCmd = &cobra.Command{
 
 			// 先检查超时情况
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				errMsg = fmt.Sprintf("请求超时 (超过 %ds)", timeout.Seconds())
+				errMsg = fmt.Sprintf("请求超时 (超过 %ds)", int(timeout.Seconds()))
 			} else if strings.Contains(errStr, "connection refused") {
 				errMsg = "连接被拒绝 (服务器未监听该端口)"
 			} else if strings.Contains(errStr, "network is unreachable") {

@@ -43,8 +43,15 @@ func NewConfigManager() *ConfigManager {
 		panic(fmt.Sprintf("无法获取用户主目录: %v", err))
 	}
 
+	// Check XDG_CONFIG_HOME environment variable for custom config location
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		// Use default XDG path (~/.config)
+		xdgConfigHome = filepath.Join(homeDir, ".config")
+	}
+
 	// Always use XDG config location (new standard)
-	xdgConfigPath := filepath.Join(homeDir, ".config", "apimgr", "config.json")
+	xdgConfigPath := filepath.Join(xdgConfigHome, "apimgr", "config.json")
 	oldConfigPath := filepath.Join(homeDir, ".apimgr.json")
 
 	configPath := xdgConfigPath
