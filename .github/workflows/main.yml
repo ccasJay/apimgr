@@ -10,6 +10,7 @@ on:
 
 env:
   GO_VERSION: 1.21
+  SKIP_WINDOWS_BUILD: 'true'
 
 jobs:
   lint:
@@ -72,6 +73,7 @@ jobs:
         run: GOOS=darwin GOARCH=amd64 go build -o apimgr-darwin-amd64
 
       - name: Build for Windows
+        if: env.SKIP_WINDOWS_BUILD != 'true'
         run: GOOS=windows GOARCH=amd64 go build -o apimgr-windows-amd64.exe
 
       - name: Clean up
