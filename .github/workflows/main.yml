@@ -26,21 +26,13 @@ jobs:
 
       - name: Install linting tools
         run: |
-          go install golang.org/x/lint/golint@latest
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          go install github.com/securego/gosec/cmd/gosec@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
       - name: Run go fmt
         run: go fmt ./...
 
-      - name: Run golint
-        run: golint -set_exit_status ./...
-
-      - name: Run staticcheck
-        run: staticcheck ./...
-
-      - name: Run gosec
-        run: gosec ./...
+      - name: Run golangci-lint
+        run: golangci-lint run --max-issues-per-linter=1000 --max-same-issues=1000
 
   test:
     name: Test
