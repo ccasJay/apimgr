@@ -8,6 +8,18 @@
 
 A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.
 
+
+
+
+
+
+
+
+
+
+## !!!WARNING : this may override your ~/.cladue/setting.json file,please remember to BACKUP.
+
+
 ## Features
 
 ### Core Features
