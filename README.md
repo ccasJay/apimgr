@@ -6,7 +6,8 @@
 
 [中文版](README.zh.md)
 
-A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.
+A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.(This project is only compatible with Claude Code for the time being, more tools like codex or gemini will be available in the future. )
+
 
 
 
