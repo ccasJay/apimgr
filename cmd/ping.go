@@ -6,13 +6,13 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"apimgr/config"
 	"apimgr/internal/providers"
+	"apimgr/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,23 +24,6 @@ var (
 	testRealAPI   bool   // Test real API functionality (simulate ClaudeCode usage)
 	apiPath       string // Custom path for real API testing
 )
-
-// Enhanced URL validation: Check protocol and hostname
-func isValidURL(u string) bool {
-	parsed, err := url.ParseRequestURI(u)
-	if err != nil {
-		return false
-	}
-	// Ensure protocol is http or https
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return false
-	}
-	// Ensure hostname exists
-	if parsed.Host == "" {
-		return false
-	}
-	return true
-}
 
 var pingCmd = &cobra.Command{
 	Use:   "ping [alias]",
@@ -123,8 +106,8 @@ var pingCmd = &cobra.Command{
 			},
 		}
 
-		// 增强URL验证
-		if !isValidURL(baseURL) {
+		// Enhanced URL validation
+		if !utils.ValidateURL(baseURL) {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
 					"error":   "Invalid URL format",
@@ -139,12 +122,12 @@ var pingCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 为配置的API添加认证头（自定义URL模式不添加）
+		// Add auth headers for configured API (not for custom URL mode)
 		var cfg *config.APIConfig
 		var apiErr error
 
 		if !isCustomURL {
-			// 获取配置
+			// Get configuration
 			if len(args) == 1 {
 				cfg, apiErr = configManager.Get(args[0])
 			} else {
@@ -152,11 +135,11 @@ var pingCmd = &cobra.Command{
 			}
 		}
 
-		// 构建最终URL（添加自定义路径）
+		// Build final URL (add custom path)
 		finalURL := baseURL
 		if testRealAPI && apiPath != "" {
-			// 如果有自定义路径，添加到URL
-			// 确保没有重复的斜杠
+			// If custom path provided, append to URL
+			// Ensure no duplicate slashes
 			if strings.HasSuffix(baseURL, "/") && strings.HasPrefix(apiPath, "/") {
 				finalURL = baseURL + apiPath[1:]
 			} else if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(apiPath, "/") {
@@ -166,29 +149,29 @@ var pingCmd = &cobra.Command{
 			}
 		}
 
-		// 决定要使用的Request method和体
+		// Determine request method and body
 		finalMethod := requestMethod
 		var requestBody io.Reader = nil
 		var contentType string = ""
 
-		// 如果是真实API测试，准备POST请求
+		// If real API test, prepare POST request
 		if testRealAPI && !isCustomURL && apiErr == nil && cfg != nil {
 			finalMethod = "POST"
 			contentType = "application/json"
 
-			// 使用默认模型或配置中的模型
+			// Use default model or model from config
 			model := cfg.Model
 			if model == "" {
-				model = "doubao-seed-code-preview-latest" // 默认Doubao模型
+				model = "doubao-seed-code-preview-latest" // Default Doubao model
 			}
 
-			// 创建简单的请求体（模拟ClaudeCode的使用方式）
-			// 使用标准的聊天API格式
+			// Create simple request body (simulate ClaudeCode usage)
+			// Use standard chat API format
 			reqBody := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"ping test"}]}`, model)
 			requestBody = strings.NewReader(reqBody)
 		}
 
-		// 创建请求
+		// Create request
 		req, err := http.NewRequest(finalMethod, finalURL, requestBody)
 		if err != nil {
 			if outputJSON {
@@ -204,26 +187,25 @@ var pingCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 设置Content-Type头（如果需要）
+		// Set Content-Type header (if needed)
 		if contentType != "" {
 			req.Header.Set("Content-Type", contentType)
 		}
 
-		// 添加适当的认证头
+		// Add appropriate auth headers
 		if !isCustomURL && apiErr == nil && cfg != nil {
 			if cfg.AuthToken != "" {
-				// 对于使用AuthToken的配置，使用Bearer认证
+				// For configs using AuthToken, use Bearer authentication
 				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.AuthToken))
 			} else if cfg.APIKey != "" {
-				// 对于使用APIKey的配置，使用Anthropic风格的API-Key头
+				// For configs using APIKey, use Anthropic-style API-Key header
 				req.Header.Set("x-api-key", cfg.APIKey)
-				// 同时支持Anthropic的格式
+				// Also support Anthropic format
 				req.Header.Set("API-Key", cfg.APIKey)
 			}
 		}
 
-
-		// 进度指示器
+		// Progress indicator
 		if !outputJSON {
 			fmt.Print("Connecting... ")
 		}
@@ -231,14 +213,14 @@ var pingCmd = &cobra.Command{
 		resp, err := client.Do(req)
 		if err != nil {
 			if !outputJSON {
-				fmt.Printf("\r") // 清除进度指示器
+				fmt.Printf("\r") // Clear progress indicator
 			}
 
-			// 分类处理错误
+			// Categorize errors
 			var errMsg string
 			errStr := err.Error()
 
-			// 先检查超时情况
+			// Check timeout first
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				errMsg = fmt.Sprintf("Request timed out (more than %ds)", int(timeout.Seconds()))
 			} else if strings.Contains(errStr, "connection refused") {

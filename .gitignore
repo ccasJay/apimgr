@@ -39,3 +39,6 @@ Thumbs.db
 
 #Claude Code related
 .claude/
+
+# Kiro specs
+.kiro/

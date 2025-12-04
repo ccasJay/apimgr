@@ -184,5 +184,5 @@ fi
 
 func init() {
 	rootCmd.AddCommand(installCmd)
-	installCmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "强制重新安装，覆盖现有配置")
+	installCmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "Force reinstall, overwrite existing configuration")
 }

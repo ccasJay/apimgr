@@ -143,7 +143,7 @@ func editConfig(alias string) error {
 	}
 
 	updatedAlias := getUpdatedAlias(alias, updates)
-	fmt.Printf("\n✅ 配置 '%s' 已更新\n", updatedAlias)
+	fmt.Printf("\n✅ Configuration '%s' updated\n", updatedAlias)
 	return nil
 }
 
@@ -255,7 +255,7 @@ func displayMaskedField(label, value, maskedValue string) {
 	if value != "" {
 		fmt.Printf("%s: %s\n", label, maskedValue)
 	} else {
-		fmt.Println(label + ": (未设置)")
+		fmt.Println(label + ": (not set)")
 	}
 }
 
@@ -462,13 +462,10 @@ func saveAndApplyChanges(configManager *config.Manager, alias string, updates ma
 	}
 
 	// Generate active.env script
-	updatedAlias := getUpdatedAlias(alias, updates)
 	if err := configManager.GenerateActiveScript(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to generate activation script: %v\n", err)
 	}
 
-	// Note: Active script regeneration is best-effort and doesn't fail the command
-	_ = updatedAlias
 	return nil
 }
 

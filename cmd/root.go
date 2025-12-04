@@ -27,10 +27,10 @@ var rootCmd = &cobra.Command{
 
 // Execute executes the root command
 func Execute() error {
-	// 设置版本信息
+	// Set version info
 	rootCmd.Version = version
 
-	// 设置版本输出格式
+	// Set version output format
 	rootCmd.SetVersionTemplate(`apimgr {{.Version}}
 Commit: ` + commit + `
 Date: ` + date + `

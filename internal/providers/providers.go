@@ -114,7 +114,7 @@ func (p *OpenAIProvider) NormalizeConfig(baseURL string) string {
 	return baseURL
 }
 
-// 初始化：注册内置提供商
+// Initialize: register built-in providers
 func init() {
 	Register("anthropic", &AnthropicProvider{})
 	Register("openai", &OpenAIProvider{})
