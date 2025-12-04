@@ -6,13 +6,13 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"apimgr/config"
 	"apimgr/internal/providers"
+	"apimgr/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,23 +24,6 @@ var (
 	testRealAPI   bool   // Test real API functionality (simulate ClaudeCode usage)
 	apiPath       string // Custom path for real API testing
 )
-
-// Enhanced URL validation: Check protocol and hostname
-func isValidURL(u string) bool {
-	parsed, err := url.ParseRequestURI(u)
-	if err != nil {
-		return false
-	}
-	// Ensure protocol is http or https
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return false
-	}
-	// Ensure hostname exists
-	if parsed.Host == "" {
-		return false
-	}
-	return true
-}
 
 var pingCmd = &cobra.Command{
 	Use:   "ping [alias]",
@@ -123,8 +106,8 @@ var pingCmd = &cobra.Command{
 			},
 		}
 
-		// 增强URL验证
-		if !isValidURL(baseURL) {
+		// Enhanced URL validation
+		if !utils.ValidateURL(baseURL) {
 			if outputJSON {
 				errData, _ := json.Marshal(map[string]interface{}{
 					"error":   "Invalid URL format",

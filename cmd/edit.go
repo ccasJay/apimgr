@@ -462,13 +462,10 @@ func saveAndApplyChanges(configManager *config.Manager, alias string, updates ma
 	}
 
 	// Generate active.env script
-	updatedAlias := getUpdatedAlias(alias, updates)
 	if err := configManager.GenerateActiveScript(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to generate activation script: %v\n", err)
 	}
 
-	// Note: Active script regeneration is best-effort and doesn't fail the command
-	_ = updatedAlias
 	return nil
 }
 

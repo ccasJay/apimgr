@@ -65,41 +65,41 @@ func TestConfigManager(t *testing.T) {
 func TestValidateConfig(t *testing.T) {
 	cm := &Manager{configPath: "/tmp/test.json"}
 
-	// 测试空别名
+	// Test empty alias
 	err := cm.validateConfig(APIConfig{Alias: "", APIKey: "key"})
-	if err == nil || err.Error() != "别名不能为空" {
-		t.Errorf("期望别名不能为空错误，实际: %v", err)
+	if err == nil || err.Error() != "Alias cannot be empty" {
+		t.Errorf("Expected 'Alias cannot be empty' error, got: %v", err)
 	}
 
-	// 测试认证方式缺失
+	// Test missing authentication
 	err = cm.validateConfig(APIConfig{Alias: "test"})
-	if err == nil || err.Error() != "API密钥和认证令牌不能同时为空" {
-		t.Errorf("期望认证方式缺失错误，实际: %v", err)
+	if err == nil || err.Error() != "API key and auth token cannot both be empty" {
+		t.Errorf("Expected 'API key and auth token cannot both be empty' error, got: %v", err)
 	}
 
-	// 测试仅使用认证令牌
+	// Test auth token only (should pass)
 	err = cm.validateConfig(APIConfig{Alias: "test", AuthToken: "token"})
 	if err != nil {
-		t.Errorf("仅认证令牌配置不应报错: %v", err)
+		t.Errorf("Auth token only config should not error: %v", err)
 	}
 
-	// 测试无效URL
+	// Test invalid URL
 	err = cm.validateConfig(APIConfig{
 		Alias:   "test",
 		APIKey:  "sk-test",
 		BaseURL: "invalid-url",
 	})
-	if err == nil || err.Error() != "无效的URL格式: invalid-url" {
-		t.Errorf("期望URL格式错误，实际: %v", err)
+	if err == nil || err.Error() != "Invalid URL format: invalid-url" {
+		t.Errorf("Expected 'Invalid URL format' error, got: %v", err)
 	}
 
-	// 测试有效配置
+	// Test valid config
 	err = cm.validateConfig(APIConfig{
 		Alias:   "test",
 		APIKey:  "sk-test",
 		BaseURL: "https://api.example.com",
 	})
 	if err != nil {
-		t.Errorf("有效配置不应该有错误: %v", err)
+		t.Errorf("Valid config should not error: %v", err)
 	}
 }
