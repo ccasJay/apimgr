@@ -143,7 +143,7 @@ func editConfig(alias string) error {
 	}
 
 	updatedAlias := getUpdatedAlias(alias, updates)
-	fmt.Printf("\n✅ 配置 '%s' 已更新\n", updatedAlias)
+	fmt.Printf("\n✅ Configuration '%s' updated\n", updatedAlias)
 	return nil
 }
 
@@ -255,7 +255,7 @@ func displayMaskedField(label, value, maskedValue string) {
 	if value != "" {
 		fmt.Printf("%s: %s\n", label, maskedValue)
 	} else {
-		fmt.Println(label + ": (未设置)")
+		fmt.Println(label + ": (not set)")
 	}
 }
 

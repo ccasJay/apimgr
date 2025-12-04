@@ -16,12 +16,12 @@ func ValidateURL(rawURL string) bool {
 		return false
 	}
 
-	// 确保协议是http或https
+	// Ensure scheme is http or https
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return false
 	}
 
-	// 确保主机名存在
+	// Ensure hostname exists
 	if parsed.Host == "" {
 		return false
 	}

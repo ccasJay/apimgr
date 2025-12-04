@@ -21,7 +21,7 @@ var listCmd = &cobra.Command{
 		configManager := config.NewConfigManager()
 		configs, err := configManager.List()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -54,7 +54,7 @@ var listCmd = &cobra.Command{
 		}
 
 		if activeName != "" {
-		fmt.Printf("\n* indicates the currently active configuration\n")
-	}
+			fmt.Printf("\n* indicates the currently active configuration\n")
+		}
 	},
 }

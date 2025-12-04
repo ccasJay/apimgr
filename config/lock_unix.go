@@ -8,17 +8,17 @@ import (
 	"os"
 )
 
-// lockFileExclusive 独占锁（写锁）
+// lockFileExclusive acquires an exclusive lock (write lock)
 func lockFileExclusive(f *os.File) error {
 	return unix.Flock(int(f.Fd()), unix.LOCK_EX)
 }
 
-// lockFileShared 共享锁（读锁）
+// lockFileShared acquires a shared lock (read lock)
 func lockFileShared(f *os.File) error {
 	return unix.Flock(int(f.Fd()), unix.LOCK_SH)
 }
 
-// unlockFile 解锁
+// unlockFile releases the file lock
 func unlockFile(f *os.File) error {
 	return unix.Flock(int(f.Fd()), unix.LOCK_UN)
 }

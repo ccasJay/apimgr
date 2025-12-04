@@ -6,13 +6,13 @@ import (
 )
 
 func TestConfigManager(t *testing.T) {
-	// 创建临时配置管理器用于测试
+	// Create temporary config manager for testing
 	cm := &Manager{configPath: "/tmp/test_apimgr.json"}
 
-	// 清理测试文件
+	// Clean up test file
 	defer os.Remove("/tmp/test_apimgr.json")
 
-	// 测试添加配置
+	// Test adding config
 	config := APIConfig{
 		Alias:   "test",
 		APIKey:  "sk-test123",
@@ -22,43 +22,43 @@ func TestConfigManager(t *testing.T) {
 
 	err := cm.Add(config)
 	if err != nil {
-		t.Fatalf("添加配置失败: %v", err)
+		t.Fatalf("Failed to add config: %v", err)
 	}
 
-	// 测试获取配置
+	// Test getting config
 	retrievedConfig, err := cm.Get("test")
 	if err != nil {
-		t.Fatalf("获取配置失败: %v", err)
+		t.Fatalf("Failed to get config: %v", err)
 	}
 
 	if retrievedConfig.Alias != "test" {
-		t.Errorf("期望别名为 'test', 实际为 '%s'", retrievedConfig.Alias)
+		t.Errorf("Expected alias 'test', got '%s'", retrievedConfig.Alias)
 	}
 
 	if retrievedConfig.APIKey != "sk-test123" {
-		t.Errorf("期望API密钥为 'sk-test123', 实际为 '%s'", retrievedConfig.APIKey)
+		t.Errorf("Expected API key 'sk-test123', got '%s'", retrievedConfig.APIKey)
 	}
 
-	// 测试列出配置
+	// Test listing configs
 	configs, err := cm.List()
 	if err != nil {
-		t.Fatalf("列出配置失败: %v", err)
+		t.Fatalf("Failed to list configs: %v", err)
 	}
 
 	if len(configs) != 1 {
-		t.Errorf("期望1个配置，实际有 %d 个", len(configs))
+		t.Errorf("Expected 1 config, got %d", len(configs))
 	}
 
-	// 测试删除配置
+	// Test removing config
 	err = cm.Remove("test")
 	if err != nil {
-		t.Fatalf("删除配置失败: %v", err)
+		t.Fatalf("Failed to remove config: %v", err)
 	}
 
-	// 验证配置已删除
+	// Verify config was deleted
 	_, err = cm.Get("test")
 	if err == nil {
-		t.Error("配置应该已被删除，但还能获取到")
+		t.Error("Config should have been deleted, but was still retrievable")
 	}
 }
 
