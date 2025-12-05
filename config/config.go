@@ -6,8 +6,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"apimgr/internal/providers"
 	"apimgr/internal/utils"
@@ -670,6 +673,7 @@ func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 	delete(env, "ANTHROPIC_API_KEY")
 	delete(env, "ANTHROPIC_AUTH_TOKEN")
 	delete(env, "ANTHROPIC_BASE_URL")
+	delete(env, "ANTHROPIC_MODEL")
 
 	// Set new environment variables
 	if cfg.APIKey != "" {
@@ -737,6 +741,7 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 	delete(env, "ANTHROPIC_API_KEY")
 	delete(env, "ANTHROPIC_AUTH_TOKEN")
 	delete(env, "ANTHROPIC_BASE_URL")
+	delete(env, "ANTHROPIC_MODEL")
 
 	// Set new environment variables
 	if cfg.APIKey != "" {
@@ -763,5 +768,246 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 	}
 
 	fmt.Printf("✅ Project-level Claude Code configuration updated: %s\n", projectClaudePath)
+	return nil
+}
+
+
+// SessionMarker represents a local session marker file
+type SessionMarker struct {
+	PID       string    `json:"pid"`
+	Alias     string    `json:"alias"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// CreateSessionMarker creates a session marker file for local mode
+func (cm *Manager) CreateSessionMarker(pid string, alias string) error {
+	marker := SessionMarker{
+		PID:       pid,
+		Alias:     alias,
+		Timestamp: time.Now(),
+	}
+
+	data, err := json.MarshalIndent(marker, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize session marker: %v", err)
+	}
+
+	markerPath := filepath.Join(filepath.Dir(cm.configPath), fmt.Sprintf("session-%s", pid))
+	if err := os.WriteFile(markerPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write session marker: %v", err)
+	}
+
+	return nil
+}
+
+// CleanupSession removes a session marker file
+func (cm *Manager) CleanupSession(pid string) error {
+	markerPath := filepath.Join(filepath.Dir(cm.configPath), fmt.Sprintf("session-%s", pid))
+	err := os.Remove(markerPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove session marker: %v", err)
+	}
+	return nil
+}
+
+// HasActiveLocalSessions checks if there are any active local sessions
+// It also cleans up stale session files (PIDs that no longer exist)
+func (cm *Manager) HasActiveLocalSessions() (bool, error) {
+	configDir := filepath.Dir(cm.configPath)
+	entries, err := os.ReadDir(configDir)
+	if err != nil {
+		return false, fmt.Errorf("failed to read config directory: %v", err)
+	}
+
+	hasActive := false
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, "session-") {
+			continue
+		}
+
+		// Extract PID from filename
+		pidStr := strings.TrimPrefix(name, "session-")
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			// Invalid session file name, clean it up
+			os.Remove(filepath.Join(configDir, name))
+			continue
+		}
+
+		// Check if process is still running
+		if isProcessRunning(pid) {
+			hasActive = true
+		} else {
+			// Clean up stale session file
+			os.Remove(filepath.Join(configDir, name))
+		}
+	}
+
+	return hasActive, nil
+}
+
+// isProcessRunning checks if a process with the given PID is still running
+func isProcessRunning(pid int) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// On Unix, FindProcess always succeeds, so we need to send signal 0 to check
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+// SyncClaudeSettingsOnly syncs configuration to Claude Code settings files
+// without updating global active field or generating active.env file.
+// This is used for local mode to update Claude Code immediately.
+func (cm *Manager) SyncClaudeSettingsOnly(cfg *APIConfig) error {
+	// Sync to global Claude Code settings
+	if err := cm.syncClaudeSettings(cfg); err != nil {
+		return fmt.Errorf("failed to sync to global Claude Code settings: %v", err)
+	}
+
+	// Sync to project-level Claude Code settings (if exists)
+	if err := cm.syncProjectClaudeConfig(cfg); err != nil {
+		// Project-level sync failure is not critical, just log it
+		fmt.Printf("⚠️  Failed to sync to project-level Claude Code settings: %v\n", err)
+	}
+
+	return nil
+}
+
+// RestoreClaudeToGlobal restores Claude Code settings to match the global active configuration.
+// If no global active configuration exists, it clears the ANTHROPIC_* env vars from Claude Code settings.
+func (cm *Manager) RestoreClaudeToGlobal() error {
+	// Get global active configuration
+	activeConfig, err := cm.GetActive()
+	if err != nil {
+		// No global active configuration, clear Claude Code settings
+		return cm.clearClaudeSettings()
+	}
+
+	// Sync global active configuration to Claude Code
+	return cm.SyncClaudeSettingsOnly(activeConfig)
+}
+
+// clearClaudeSettings removes ANTHROPIC_* environment variables from Claude Code settings files
+func (cm *Manager) clearClaudeSettings() error {
+	// Clear global Claude Code settings
+	if err := cm.clearGlobalClaudeSettings(); err != nil {
+		return fmt.Errorf("failed to clear global Claude Code settings: %v", err)
+	}
+
+	// Clear project-level Claude Code settings (if exists)
+	if err := cm.clearProjectClaudeSettings(); err != nil {
+		// Project-level clear failure is not critical, just log it
+		fmt.Printf("⚠️  Failed to clear project-level Claude Code settings: %v\n", err)
+	}
+
+	return nil
+}
+
+// clearGlobalClaudeSettings removes ANTHROPIC_* env vars from global Claude Code settings
+func (cm *Manager) clearGlobalClaudeSettings() error {
+	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
+
+	// Check if Claude Code config file exists
+	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
+		// File doesn't exist, nothing to clear
+		return nil
+	}
+
+	// Read existing settings
+	data, err := os.ReadFile(claudeSettingsPath)
+	if err != nil {
+		return fmt.Errorf("failed to read global Claude Code settings: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return fmt.Errorf("failed to parse global Claude Code settings: %v", err)
+	}
+
+	// Check if env field exists
+	if settings["env"] == nil {
+		// No env field, nothing to clear
+		return nil
+	}
+
+	env := settings["env"].(map[string]interface{})
+
+	// Clear ANTHROPIC related variables
+	delete(env, "ANTHROPIC_API_KEY")
+	delete(env, "ANTHROPIC_AUTH_TOKEN")
+	delete(env, "ANTHROPIC_BASE_URL")
+	delete(env, "ANTHROPIC_MODEL")
+
+	// Write back to file
+	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize global Claude Code settings: %v", err)
+	}
+
+	if err := os.WriteFile(claudeSettingsPath, updatedData, 0600); err != nil {
+		return fmt.Errorf("failed to write global Claude Code settings: %v", err)
+	}
+
+	return nil
+}
+
+// clearProjectClaudeSettings removes ANTHROPIC_* env vars from project-level Claude Code settings
+func (cm *Manager) clearProjectClaudeSettings() error {
+	// Get current working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// Project-level config file path
+	projectClaudePath := filepath.Join(workDir, ".claude", "settings.json")
+
+	// Check if project has .claude directory
+	if _, err := os.Stat(projectClaudePath); os.IsNotExist(err) {
+		// No project-level config, nothing to clear
+		return nil
+	}
+
+	// Read project-level config
+	data, err := os.ReadFile(projectClaudePath)
+	if err != nil {
+		return fmt.Errorf("failed to read project-level Claude Code settings: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return fmt.Errorf("failed to parse project-level Claude Code settings: %v", err)
+	}
+
+	// Check if env field exists
+	if settings["env"] == nil {
+		// No env field, nothing to clear
+		return nil
+	}
+
+	env := settings["env"].(map[string]interface{})
+
+	// Clear ANTHROPIC related variables
+	delete(env, "ANTHROPIC_API_KEY")
+	delete(env, "ANTHROPIC_AUTH_TOKEN")
+	delete(env, "ANTHROPIC_BASE_URL")
+	delete(env, "ANTHROPIC_MODEL")
+
+	// Write back to file
+	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize project-level Claude Code settings: %v", err)
+	}
+
+	if err := os.WriteFile(projectClaudePath, updatedData, 0600); err != nil {
+		return fmt.Errorf("failed to write project-level Claude Code settings: %v", err)
+	}
+
 	return nil
 }

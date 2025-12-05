@@ -36,8 +36,31 @@ Using -l/--local parameter switches configuration only in current shell session 
 
 		configManager := config.NewConfigManager()
 
-		// Only update global configuration if not in local mode
-		if !local {
+		// Get the configuration first (needed for both modes)
+		apiConfig, err := configManager.Get(alias)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if local {
+			// Local mode: update Claude Code but not global active
+			pid := fmt.Sprintf("%d", os.Getpid())
+
+			// Create session marker
+			if err := configManager.CreateSessionMarker(pid, alias); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to create session marker: %v\n", err)
+			}
+
+			// Sync to Claude Code only (no global active update)
+			if err := configManager.SyncClaudeSettingsOnly(apiConfig); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to sync to Claude Code: %v\n", err)
+			}
+
+			// Output trap command for cleanup on shell exit
+			fmt.Printf("trap 'apimgr cleanup-session %s' EXIT\n", pid)
+		} else {
+			// Global mode: update global configuration
 			// Set the active configuration
 			err := configManager.SetActive(alias)
 			if err != nil {
@@ -52,13 +75,6 @@ Using -l/--local parameter switches configuration only in current shell session 
 
 			// Show sync information
 			showSyncInfo(alias)
-		}
-
-		// Get the configuration (needed for generating env vars)
-		apiConfig, err := configManager.Get(alias)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
 		}
 
 		// Clear previous environment variables
@@ -84,7 +100,11 @@ Using -l/--local parameter switches configuration only in current shell session 
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
 
 		// Print success message to stderr so it doesn't interfere with eval
-		fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
+		if local {
+			fmt.Fprintf(os.Stderr, "✓ Switched to configuration locally: %s\n", alias)
+		} else {
+			fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
+		}
 	},
 }
 
