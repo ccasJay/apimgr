@@ -133,6 +133,25 @@ For detailed usage, see the [Quick Start Guide](QUICKSTART.md).
 }
 ```
 
+### Provider Auto-Detection
+When the `provider` field is not explicitly set, apimgr will automatically detect the provider based on the base URL:
+
+| URL Pattern | Detected Provider |
+|-------------|-------------------|
+| `*api.anthropic.com*` | anthropic |
+| `*api.openai.com*` | openai |
+| Other URLs | anthropic (default) |
+
+This means you can omit the `provider` field when adding configurations with standard API URLs:
+```bash
+# Provider will be auto-detected as "anthropic"
+apimgr add my-anthropic --sk sk-ant-... --url https://api.anthropic.com
+
+# Provider will be auto-detected as "openai"
+apimgr add my-openai --sk sk-... --url https://api.openai.com
+```
+```
+
 ## Commands
 
 ### Basic Commands
@@ -156,8 +175,17 @@ apimgr ping -u URL           # Test custom URL
 apimgr ping -X GET           # Use specific HTTP method
 apimgr ping -t 30s           # Custom timeout
 apimgr ping -j               # JSON output
-apimgr ping -T -p /chat/completions  # Test real API with POST request
+apimgr ping -T               # Test real API compatibility (auto-detects provider from URL)
+apimgr ping -T -p /chat/completions  # Test real API with custom endpoint path
+apimgr ping -T --stream      # Test streaming API compatibility
+apimgr ping -T -v            # Verbose output with request/response details
 ```
+
+The `-T` flag enables compatibility testing mode, which:
+- Sends a real chat completion request to validate API format
+- Auto-detects the provider (Anthropic/OpenAI) from the base URL
+- Validates response structure matches Claude Code expectations
+- Supports streaming mode testing with `--stream` flag
 
 #### `apimgr status`
 Shows configuration source priority (shell environment overrides global):
