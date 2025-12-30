@@ -72,7 +72,9 @@ apimgr switch my-config
 apimgr status
 
 # 5. 测试连通性
-apimgr ping
+apimgr ping              # 基本连通性测试
+apimgr ping -T           # 兼容性测试（自动检测 provider）
+apimgr ping -T --stream  # 测试流式响应兼容性
 
 # 6. 列出所有配置
 apimgr list
@@ -141,10 +143,31 @@ apimgr add --ak <your-auth-token>
       "api_key": "sk-xxxxxxxx",
       "auth_token": "",
       "base_url": "https://api.anthropic.com",
-      "model": "claude-3"
+      "model": "claude-3",
+      "provider": "anthropic"
     }
   ]
 }
+```
+
+### Provider 自动检测
+
+当配置中未显式设置 `provider` 字段时，apimgr 会根据 base URL 自动检测 provider 类型：
+
+| URL 模式 | 检测到的 Provider |
+|----------|-------------------|
+| `*api.anthropic.com*` | anthropic |
+| `*api.openai.com*` | openai |
+| 其他 URL | anthropic (默认) |
+
+这意味着在添加使用标准 API URL 的配置时，可以省略 `provider` 字段：
+```bash
+# Provider 将自动检测为 "anthropic"
+apimgr add my-anthropic --sk sk-ant-... --url https://api.anthropic.com
+
+# Provider 将自动检测为 "openai"
+apimgr add my-openai --sk sk-... --url https://api.openai.com
+```
 ```
 
 ### 环境变量
@@ -295,6 +318,30 @@ apimgr edit <alias> [--sk <new-key>] [--ak <new-token>] [--url <new-url>] [--mod
 ```bash
 apimgr remove <别名>
 ```
+
+### ping
+
+测试 API 连通性和兼容性
+
+```bash
+# 基本连通性测试
+apimgr ping [alias]          # 测试指定或当前活动配置
+apimgr ping -u URL           # 测试自定义 URL
+apimgr ping -t 30s           # 自定义超时时间
+apimgr ping -j               # JSON 格式输出
+
+# 兼容性测试模式 (-T)
+apimgr ping -T               # 测试 API 兼容性（自动检测 provider）
+apimgr ping -T --stream      # 测试流式响应兼容性
+apimgr ping -T -p /custom    # 使用自定义端点路径
+apimgr ping -T -v            # 详细输出（显示请求/响应内容）
+```
+
+`-T` 标志启用兼容性测试模式，功能包括：
+- 发送真实的 chat completion 请求验证 API 格式
+- 根据 base URL 自动检测 provider 类型（Anthropic/OpenAI）
+- 验证响应结构是否符合 Claude Code 的期望
+- 使用 `--stream` 标志测试流式响应支持
 
 ## Shell 集成
 

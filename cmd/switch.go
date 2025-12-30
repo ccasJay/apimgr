@@ -13,6 +13,8 @@ func init() {
 	rootCmd.AddCommand(switchCmd)
 	// Add local switch parameter
 	switchCmd.Flags().BoolP("local", "l", false, "Only take effect in current shell, does not modify global configuration")
+	// Add model switch parameter
+	switchCmd.Flags().StringP("model", "m", "", "Switch to a specific model within the configuration")
 }
 
 var switchCmd = &cobra.Command{
@@ -26,23 +28,74 @@ To make environment variables effective in current shell, there are two methods:
 
 Using -l/--local parameter switches configuration only in current shell session without modifying global configuration:
   apimgr switch -l <alias>
-  eval "$(apimgr switch -l <alias>)"`,
+  eval "$(apimgr switch -l <alias>)"
+
+Using -m/--model parameter switches to a specific model within the configuration:
+  apimgr switch <alias> --model claude-3-sonnet
+  eval "$(apimgr switch <alias> -m gpt-4)"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		alias := args[0]
 
 		// Read the local flag
 		local, _ := cmd.Flags().GetBool("local")
+		// Read the model flag
+		modelFlag, _ := cmd.Flags().GetString("model")
 
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 
-		// Only update global configuration if not in local mode
-		if !local {
-			// Set the active configuration
-			err := configManager.SetActive(alias)
+		// Get the configuration first (needed for both modes)
+		apiConfig, err := configManager.Get(alias)
+		if err != nil {
+			return err
+		}
+
+		// Handle model switch if --model flag is provided
+		if modelFlag != "" {
+			// Validate model is in supported list
+			validator := config.NewModelValidator()
+			if err := validator.ValidateModelInList(modelFlag, apiConfig.Models); err != nil {
+				return err
+			}
+
+			// Switch the model in the configuration
+			if err := configManager.SwitchModel(alias, modelFlag); err != nil {
+				return err
+			}
+
+			// Refresh the config to get the updated model
+			apiConfig, err = configManager.Get(alias)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
+			}
+
+			fmt.Fprintf(os.Stderr, "✓ Switched model to: %s\n", modelFlag)
+		}
+
+		if local {
+			// Local mode: update Claude Code but not global active
+			pid := fmt.Sprintf("%d", os.Getpid())
+
+			// Create session marker
+			if err := configManager.CreateSessionMarker(pid, alias); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to create session marker: %v\n", err)
+			}
+
+			// Sync to Claude Code only (no global active update)
+			if err := configManager.SyncClaudeSettingsOnly(apiConfig); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to sync to Claude Code: %v\n", err)
+			}
+
+			// Output trap command for cleanup on shell exit
+			fmt.Printf("trap 'apimgr cleanup-session %s' EXIT\n", pid)
+		} else {
+			// Global mode: update global configuration
+			// Set the active configuration
+			if err := configManager.SetActive(alias); err != nil {
+				return err
 			}
 
 			// Generate active.env script for auto-loading
@@ -52,13 +105,6 @@ Using -l/--local parameter switches configuration only in current shell session 
 
 			// Show sync information
 			showSyncInfo(alias)
-		}
-
-		// Get the configuration (needed for generating env vars)
-		apiConfig, err := configManager.Get(alias)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
 		}
 
 		// Clear previous environment variables
@@ -83,8 +129,14 @@ Using -l/--local parameter switches configuration only in current shell session 
 		}
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
 
-		// Print success message to stderr so it doesn't interfere with eval
-		fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
+		if local {
+			fmt.Fprintf(os.Stderr, "✓ Switched to configuration locally: %s\n", alias)
+		} else {
+			if modelFlag == "" {
+				fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
+			}
+		}
+		return nil
 	},
 }
 

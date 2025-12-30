@@ -18,18 +18,17 @@ var enableCmd = &cobra.Command{
 - Configuration file migration
 - Shell integration
 - Active environment file generation`,
-	Run: runEnable,
+	RunE: runEnable,
 }
 
 func init() {
 	rootCmd.AddCommand(enableCmd)
 }
 
-func runEnable(cmd *cobra.Command, args []string) {
+func runEnable(cmd *cobra.Command, args []string) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to get home directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
 	configDir := filepath.Join(homeDir, ".config", "apimgr")
@@ -40,8 +39,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 	// Step 1: Create XDG directory structure
 	fmt.Println("📁 Creating XDG-compliant directory structure...")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to create config directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Step 2: Migrate configuration if needed
@@ -51,13 +49,11 @@ func runEnable(cmd *cobra.Command, args []string) {
 
 			data, err := os.ReadFile(oldConfigPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to read old config: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to read old config: %w", err)
 			}
 
 			if err := os.WriteFile(newConfigPath, data, 0600); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to write new config: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to write new config: %w", err)
 			}
 
 			fmt.Println("✅ Configuration migrated successfully")
@@ -70,8 +66,7 @@ func runEnable(cmd *cobra.Command, args []string) {
 		if _, err := os.Stat(newConfigPath); os.IsNotExist(err) {
 			defaultConfig := `{"active":"","configs":[]}`
 			if err := os.WriteFile(newConfigPath, []byte(defaultConfig), 0600); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to create config file: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to create config file: %w", err)
 			}
 			fmt.Println("✅ Created new configuration file")
 		}
@@ -81,7 +76,10 @@ func runEnable(cmd *cobra.Command, args []string) {
 	fmt.Println("🔧 Setting up configuration...")
 	if _, err := os.Stat(newConfigPath); err == nil {
 		// Load config and generate active.env
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		if err := configManager.GenerateActiveScript(); err == nil {
 			fmt.Printf("✅ Configuration ready at %s\n", newConfigPath)
 		}
@@ -131,4 +129,5 @@ func runEnable(cmd *cobra.Command, args []string) {
 	fmt.Println("4. Use 'apimgr switch' to switch between configurations")
 	fmt.Println("5. Configuration changes automatically apply to new terminal sessions")
 	fmt.Println("\nTo verify the setup, run: apimgr status")
+	return nil
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"apimgr/config"
 	"github.com/spf13/cobra"
@@ -17,16 +16,18 @@ var removeCmd = &cobra.Command{
 	Short: "Remove specified API configuration",
 	Long:  "Remove API configuration with specified alias",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		alias := args[0]
 
-		configManager := config.NewConfigManager()
-		err := configManager.Remove(alias)
+		configManager, err := config.NewConfigManager()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
+		if err := configManager.Remove(alias); err != nil {
+			return err
 		}
 
 		fmt.Printf("Configuration removed: %s\n", alias)
+		return nil
 	},
 }

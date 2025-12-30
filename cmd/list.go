@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"strings"
 
 	"apimgr/config"
 	"apimgr/internal/utils"
@@ -17,44 +17,72 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all API configurations",
 	Long:  "List all saved API configurations",
-	Run: func(cmd *cobra.Command, args []string) {
-		configManager := config.NewConfigManager()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		configs, err := configManager.List()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if len(configs) == 0 {
 			fmt.Println("No configurations available")
-			return
+			return nil
 		}
 
 		// Get active configuration name
 		activeName, _ := configManager.GetActiveName()
 
 		fmt.Println("Available configurations:")
-		for _, config := range configs {
+		for _, cfg := range configs {
 			// Display masked API key or auth token
 			var authInfo string
-			if config.APIKey != "" {
-				authInfo = "API Key: " + utils.MaskAPIKey(config.APIKey)
+			if cfg.APIKey != "" {
+				authInfo = "API Key: " + utils.MaskAPIKey(cfg.APIKey)
 			} else {
-				authInfo = "Auth Token: " + utils.MaskAPIKey(config.AuthToken)
+				authInfo = "Auth Token: " + utils.MaskAPIKey(cfg.AuthToken)
 			}
 
 			// Mark active configuration with *
 			activeMarker := " "
-			if config.Alias == activeName {
+			if cfg.Alias == activeName {
 				activeMarker = "*"
 			}
 
-			fmt.Printf("%s %s: %s (URL: %s, Model: %s)\n",
-				activeMarker, config.Alias, authInfo, config.BaseURL, config.Model)
+			// Format models display with active model marker
+			modelsDisplay := formatModelsDisplay(cfg.Models, cfg.Model)
+
+			fmt.Printf("%s %s: %s (URL: %s, Models: %s)\n",
+				activeMarker, cfg.Alias, authInfo, cfg.BaseURL, modelsDisplay)
 		}
 
 		if activeName != "" {
 			fmt.Printf("\n* indicates the currently active configuration\n")
 		}
+		fmt.Printf("[active] indicates the currently active model within a configuration\n")
+		return nil
 	},
+}
+
+// formatModelsDisplay formats the models list for display, marking the active model.
+// Requirements: 3.1, 3.3
+func formatModelsDisplay(models []string, activeModel string) string {
+	if len(models) == 0 {
+		if activeModel != "" {
+			return activeModel + " [active]"
+		}
+		return "(none)"
+	}
+
+	var parts []string
+	for _, model := range models {
+		if model == activeModel {
+			parts = append(parts, model+" [active]")
+		} else {
+			parts = append(parts, model)
+		}
+	}
+	return strings.Join(parts, ", ")
 }

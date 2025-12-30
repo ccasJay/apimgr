@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"apimgr/config"
 	"apimgr/internal/utils"
@@ -17,7 +18,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show currently active configuration",
 	Long:  "Show currently active API configuration information, including global configuration and current shell environment",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get shell environment variables
 		shellAPIKey := os.Getenv("ANTHROPIC_API_KEY")
 		shellAuthToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
@@ -26,7 +27,10 @@ var statusCmd = &cobra.Command{
 		shellActiveAlias := os.Getenv("APIMGR_ACTIVE")
 
 		// Get global configuration
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		globalActiveConfig, globalErr := configManager.GetActive()
 		var globalActiveAlias string
 		if globalErr == nil {
@@ -51,8 +55,13 @@ var statusCmd = &cobra.Command{
 			if globalActiveConfig.BaseURL != "" {
 				fmt.Printf("   Base URL: %s\n", globalActiveConfig.BaseURL)
 			}
+			// Show active model
 			if globalActiveConfig.Model != "" {
-				fmt.Printf("   Model: %s\n", globalActiveConfig.Model)
+				fmt.Printf("   Active Model: %s\n", globalActiveConfig.Model)
+			}
+			// Show all supported models (Requirements: 3.2, 3.3)
+			if len(globalActiveConfig.Models) > 0 {
+				fmt.Printf("   Supported Models: %s\n", formatModelsListForStatus(globalActiveConfig.Models, globalActiveConfig.Model))
 			}
 		}
 
@@ -95,5 +104,24 @@ var statusCmd = &cobra.Command{
 		}
 
 		fmt.Println("\n💡 Tip: Run 'apimgr install' to install shell integration for better experience")
+		return nil
 	},
+}
+
+// formatModelsListForStatus formats the models list for status display, marking the active model.
+// Requirements: 3.2, 3.3
+func formatModelsListForStatus(models []string, activeModel string) string {
+	if len(models) == 0 {
+		return "(none)"
+	}
+
+	var parts []string
+	for _, model := range models {
+		if model == activeModel {
+			parts = append(parts, model+" [active]")
+		} else {
+			parts = append(parts, model)
+		}
+	}
+	return strings.Join(parts, ", ")
 }

@@ -11,6 +11,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// parseModelsList parses a comma-separated string into a list of model names.
+// It trims whitespace from each model and removes empty entries.
+func parseModelsList(modelsStr string) []string {
+	if modelsStr == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(modelsStr, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
+}
+
 // APIConfigBuilder is responsible for building and validating APIConfig
 type APIConfigBuilder struct {
 	config *config.APIConfig
@@ -50,6 +70,12 @@ func (b *APIConfigBuilder) SetBaseURL(url string) *APIConfigBuilder {
 // SetModel sets the model
 func (b *APIConfigBuilder) SetModel(model string) *APIConfigBuilder {
 	b.config.Model = model
+	return b
+}
+
+// SetModels sets the models list
+func (b *APIConfigBuilder) SetModels(models []string) *APIConfigBuilder {
+	b.config.Models = models
 	return b
 }
 
@@ -161,17 +187,23 @@ var addCmd = &cobra.Command{
    apimgr add my-config --sk sk-xxx --url https://api.anthropic.com --model claude-3
    apimgr add my-config --ak bearer-token -u https://api.anthropic.com -m claude-3
 
-3. Preset mode (has preset but missing alias):
+3. Multi-model configuration:
+   apimgr add my-config --sk sk-xxx --models "claude-3-opus,claude-3-sonnet,gpt-4"
+   apimgr add my-config --sk sk-xxx --model claude-3-opus --models "claude-3-opus,claude-3-sonnet"
+
+4. Preset mode (has preset but missing alias):
    apimgr add --sk sk-xxx -u https://api.anthropic.com -m claude-3
    apimgr add --ak bearer-token`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		configManager := config.NewConfigManager()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		collector := &InputCollector{}
 
 		// Determine input mode
 		var cfg *config.APIConfig
-		var err error
 
 		hasSK := cmd.Flags().Lookup("sk").Changed
 		hasAK := cmd.Flags().Lookup("ak").Changed
@@ -185,6 +217,7 @@ var addCmd = &cobra.Command{
 			authToken, _ := cmd.Flags().GetString("ak")
 			url, _ := cmd.Flags().GetString("url")
 			model, _ := cmd.Flags().GetString("model")
+			modelsStr, _ := cmd.Flags().GetString("models")
 
 			// Set default value
 			if url == "" {
@@ -200,12 +233,56 @@ var addCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
+			// Process models list and model/models flag interaction
+			var models []string
+			hasModel := cmd.Flags().Lookup("model").Changed
+			hasModels := cmd.Flags().Lookup("models").Changed
+
+			if hasModels {
+				// Parse comma-separated models list
+				models = parseModelsList(modelsStr)
+				// Validate models list is not empty
+				if len(models) == 0 {
+					fmt.Println("❌ Error: --models list cannot be empty")
+					os.Exit(1)
+				}
+			}
+
+			// Handle model/models flag interaction logic
+			// Requirements: 1.2, 1.3, 1.4
+			switch {
+			case hasModel && hasModels:
+				// When both provided: use --model as active, --models as list
+				// Validate that --model is in --models list
+				modelInList := false
+				for _, m := range models {
+					if m == model {
+						modelInList = true
+						break
+					}
+				}
+				if !modelInList {
+					// Add the active model to the list if not present
+					models = append([]string{model}, models...)
+				}
+			case hasModels && !hasModel:
+				// When only --models: use first as active
+				model = models[0]
+			case hasModel && !hasModels:
+				// When only --model: create single-item models list
+				models = []string{model}
+			default:
+				// Neither provided: models list remains empty (backward compatible)
+				models = nil
+			}
+
 			builder := NewAPIConfigBuilder().
 				SetAlias(alias).
 				SetAPIKey(apiKey).
 				SetAuthToken(authToken).
 				SetBaseURL(url).
-				SetModel(model)
+				SetModel(model).
+				SetModels(models)
 
 			cfg, err = builder.Build()
 			if err != nil {
@@ -264,13 +341,15 @@ var addCmd = &cobra.Command{
 
 		fmt.Printf("✅ Configuration added: %s\n", cfg.Alias)
 		fmt.Println("\n💡 Tip: Run 'apimgr switch <alias>' to switch to this configuration")
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.Flags().StringP("url", "u", "", "API base URL")
-	addCmd.Flags().StringP("model", "m", "", "Model name")
+	addCmd.Flags().StringP("model", "m", "", "Model name (active model)")
+	addCmd.Flags().String("models", "", "Comma-separated list of supported models")
 	addCmd.Flags().String("sk", "", "API key (ANTHROPIC_API_KEY)")
 	addCmd.Flags().String("ak", "", "Auth token (ANTHROPIC_AUTH_TOKEN)")
 }

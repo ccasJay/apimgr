@@ -19,6 +19,7 @@ type EditFlags struct {
 	AuthToken string
 	BaseURL   string
 	Model     string
+	Models    string
 }
 
 func init() {
@@ -30,6 +31,7 @@ func init() {
 	editCmd.Flags().String("ak", "", "Change auth token")
 	editCmd.Flags().String("url", "", "Change base URL")
 	editCmd.Flags().String("model", "", "Change model name")
+	editCmd.Flags().String("models", "", "Change supported models list (comma-separated)")
 }
 
 var editCmd = &cobra.Command{
@@ -48,9 +50,12 @@ Examples:
   apimgr edit myconfig --sk sk-ant-api03-xxx
 
   # Non-interactive edit multiple fields
-  apimgr edit myconfig --url https://api.anthropic.com --model claude-3-opus-20240229`,
+  apimgr edit myconfig --url https://api.anthropic.com --model claude-3-opus-20240229
+
+  # Edit supported models list
+  apimgr edit myconfig --models "claude-3-opus,claude-3-sonnet,claude-3-haiku"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		alias := args[0]
 
 		// Check if any flags are provided for non-interactive editing
@@ -59,6 +64,7 @@ Examples:
 		akFlag, _ := cmd.Flags().GetString("ak")
 		urlFlag, _ := cmd.Flags().GetString("url")
 		modelFlag, _ := cmd.Flags().GetString("model")
+		modelsFlag, _ := cmd.Flags().GetString("models")
 
 		// Parse flags into updates map
 		updates := make(map[string]string)
@@ -77,14 +83,19 @@ Examples:
 		if modelFlag != "" {
 			updates["model"] = modelFlag
 		}
+		if modelsFlag != "" {
+			updates["models"] = modelsFlag
+		}
 
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 
 		if len(updates) > 0 {
 			// Non-interactive mode: directly apply changes
 			if err := saveAndApplyChanges(configManager, alias, updates); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			// Show success message with updated alias
@@ -96,10 +107,10 @@ Examples:
 		} else {
 			// Interactive mode: guide user through editing
 			if err := editConfig(alias); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 		}
+		return nil
 	},
 }
 
@@ -117,15 +128,20 @@ const (
 	FieldBaseURL
 	// FieldModel represents the model field
 	FieldModel
+	// FieldModels represents the models list field
+	FieldModels
 )
 
 func editConfig(alias string) error {
-	configManager := config.NewConfigManager()
+	configManager, err := config.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize config manager: %w", err)
+	}
 
 	// Get the current configuration
 	currentConfig, err := configManager.Get(alias)
 	if err != nil {
-		return fmt.Errorf("Failed to get configuration: %v", err)
+		return fmt.Errorf("failed to get configuration: %w", err)
 	}
 
 	// Display current configuration
@@ -216,6 +232,7 @@ func showMenu(updateCount int) {
 	fmt.Println("3. Auth token (auth_token)")
 	fmt.Println("4. Base URL (base_url)")
 	fmt.Println("5. Model name (model)")
+	fmt.Println("6. Supported models (models)")
 	fmt.Println("p. Preview changes")
 	fmt.Println("0. Complete edit and save")
 	fmt.Println("q. Exit without saving")
@@ -239,8 +256,17 @@ func displayConfig(config config.APIConfig) {
 	displayMaskedField("3. Auth token", config.AuthToken, utils.MaskAPIKey(config.AuthToken))
 	displayField("4. Base URL", config.BaseURL, "https://api.anthropic.com (default)")
 	displayField("5. Model name", config.Model, "(not set)")
+	displayModelsField("6. Supported models", config.Models)
 
 	fmt.Println(strings.Repeat("=", 60))
+}
+
+func displayModelsField(label string, models []string) {
+	if len(models) > 0 {
+		fmt.Printf("%s: %s\n", label, strings.Join(models, ", "))
+	} else {
+		fmt.Printf("%s: (not set)\n", label)
+	}
 }
 
 func displayField(label, value, defaultValue string) {
@@ -289,8 +315,11 @@ func parseFieldChoice(choice string, fieldType *FieldType, fieldName *string) er
 	case "5":
 		*fieldType = FieldModel
 		*fieldName = "Model Name"
+	case "6":
+		*fieldType = FieldModels
+		*fieldName = "Supported Models"
 	default:
-		return fmt.Errorf("Invalid choice, please enter 0-5, p, or q")
+		return fmt.Errorf("Invalid choice, please enter 0-6, p, or q")
 	}
 	return nil
 }
@@ -355,6 +384,8 @@ func getCurrentValue(config *config.APIConfig, updates map[string]string, fieldT
 		return config.BaseURL
 	case FieldModel:
 		return config.Model
+	case FieldModels:
+		return strings.Join(config.Models, ", ")
 	default:
 		return ""
 	}
@@ -372,6 +403,8 @@ func getFieldKey(fieldType FieldType) string {
 		return "base_url"
 	case FieldModel:
 		return "model"
+	case FieldModels:
+		return "models"
 	default:
 		return ""
 	}
@@ -401,6 +434,13 @@ func validateFieldValue(fieldType FieldType, value string, currentConfig *config
 		otherAuth := getOtherAuthValue(fieldType, currentConfig, value)
 		if otherAuth == "" && value == "" {
 			return fmt.Errorf("API key and auth token cannot both be empty")
+		}
+	case FieldModels:
+		// Validate models list using ModelValidator
+		models := parseModelsList(value)
+		validator := config.NewModelValidator()
+		if err := validator.ValidateModelsList(models); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -435,6 +475,13 @@ func previewChanges(currentConfig config.APIConfig, updates map[string]string) {
 	}
 	if newModel, ok := updates["model"]; ok {
 		fmt.Printf("Model Name: %s → %s\n", currentConfig.Model, newModel)
+	}
+	if newModels, ok := updates["models"]; ok {
+		currentModelsStr := strings.Join(currentConfig.Models, ", ")
+		if currentModelsStr == "" {
+			currentModelsStr = "(not set)"
+		}
+		fmt.Printf("Supported Models: %s → %s\n", currentModelsStr, newModels)
 	}
 
 	fmt.Println(strings.Repeat("=", 60))
@@ -480,6 +527,16 @@ func applyUpdates(configManager *config.Manager, alias string, updates map[strin
 
 	// Remove alias from updates
 	delete(updates, "alias")
+
+	// Handle models update separately using SetModels method
+	// This handles active model preservation/fallback (Requirements: 4.2, 4.3)
+	if modelsStr, ok := updates["models"]; ok {
+		models := parseModelsList(modelsStr)
+		if err := configManager.SetModels(alias, models); err != nil {
+			return fmt.Errorf("Failed to update models: %v", err)
+		}
+		delete(updates, "models")
+	}
 
 	// Apply other field updates
 	if len(updates) > 0 {

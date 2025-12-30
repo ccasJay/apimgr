@@ -27,9 +27,9 @@ Subcommands:
   init       Initialize tool configuration files for project
   list       List all tools that can be synced`,
 	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Default to show status
-		showSyncStatus()
+		return showSyncStatus()
 	},
 }
 
@@ -81,18 +81,21 @@ func init() {
 	syncCmd.AddCommand(syncListCmd)
 }
 
-func showSyncStatus() {
+func showSyncStatus() error {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("Configuration Sync Status")
 	fmt.Println(strings.Repeat("=", 60))
 
-	configManager := config.NewConfigManager()
+	configManager, err := config.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize config manager: %w", err)
+	}
 
 	// Show current active configuration
 	active, err := configManager.GetActive()
 	if err != nil {
 		fmt.Println("\n❌ No active configuration")
-		return
+		return nil
 	}
 
 	fmt.Printf("\nCurrent configuration: %s\n", active.Alias)
@@ -121,17 +124,23 @@ func showSyncStatus() {
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 60))
+	return nil
 }
 
 func runSyncStatus(cmd *cobra.Command, args []string) {
-	showSyncStatus()
+	if err := showSyncStatus(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	}
 }
 
 func runSyncClaude(cmd *cobra.Command, args []string) {
-	configManager := config.NewConfigManager()
-
-	_, err := configManager.GetActive()
+	configManager, err := config.NewConfigManager()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to initialize config manager: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := configManager.GetActive(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

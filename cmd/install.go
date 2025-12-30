@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	forceInstall bool
+	forceInstall         bool
+	noShellIntegration   bool
 )
 
 var installCmd = &cobra.Command{
@@ -18,6 +19,12 @@ var installCmd = &cobra.Command{
 	Short: "Install shell initialization script",
 	Long:  "Add auto-load command to shell configuration file, so new terminals automatically load active configuration",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Skip shell integration if flag is set
+		if noShellIntegration {
+			fmt.Println("Shell integration skipped (--no-shell-integration flag set)")
+			return
+		}
+
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to get user home directory: %v\n", err)
@@ -185,4 +192,5 @@ fi
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "Force reinstall, overwrite existing configuration")
+	installCmd.Flags().BoolVar(&noShellIntegration, "no-shell-integration", false, "Skip shell integration (do not modify shell RC files)")
 }
