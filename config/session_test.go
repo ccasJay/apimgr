@@ -10,17 +10,41 @@ import (
 	"time"
 )
 
+// setupTestSession creates a test config manager with a temporary directory
+func setupTestSession(t *testing.T) (*Manager, string) {
+	t.Helper()
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.json")
+	cm := &Manager{configPath: configPath}
+	return cm, tempDir
+}
+
+// setupTestClaudeEnv creates a fake home directory with Claude settings for testing
+func setupTestClaudeEnv(t *testing.T, tempDir string) (string, func()) {
+	t.Helper()
+	fakeHome := filepath.Join(tempDir, "home")
+	claudeDir := filepath.Join(fakeHome, ".claude")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("Failed to create claude dir: %v", err)
+	}
+
+	// Override HOME for this test
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", fakeHome)
+	cleanup := func() {
+		os.Setenv("HOME", originalHome)
+	}
+
+	return fakeHome, cleanup
+}
+
 // Feature: switch-local-mode-fix, Property 5: Local mode creates session marker
 // Validates: Requirements 1.5
 // For any valid alias, executing `apimgr switch -l <alias>` should create a session marker file
 // containing the PID, alias, and timestamp
 func TestPropertySessionMarkerCreation(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	_, tempDir := setupTestSession(t)
 
 	// Property: For any valid PID and alias, CreateSessionMarker should create a file
 	// with the correct content (PID, alias, and timestamp)
@@ -30,7 +54,7 @@ func TestPropertySessionMarkerCreation(t *testing.T) {
 			pidNum = 1
 		}
 		pid := strconv.Itoa(int(pidNum))
-		
+
 		// Generate a valid alias (non-empty alphanumeric string)
 		alias := "test"
 		if len(aliasBytes) > 0 {
@@ -103,18 +127,11 @@ func TestPropertySessionMarkerCreation(t *testing.T) {
 
 // Test CleanupSession removes marker file
 func TestCleanupSession(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	configPath := filepath.Join(tempDir, "config.json")
-	cm := &Manager{configPath: configPath}
+	cm, tempDir := setupTestSession(t)
 
 	// Create a session marker
 	pid := "12345"
-	err = cm.CreateSessionMarker(pid, "test-alias")
+	err := cm.CreateSessionMarker(pid, "test-alias")
 	if err != nil {
 		t.Fatalf("Failed to create session marker: %v", err)
 	}
@@ -145,14 +162,7 @@ func TestCleanupSession(t *testing.T) {
 
 // Test HasActiveLocalSessions detects active sessions and cleans stale ones
 func TestHasActiveLocalSessions(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	configPath := filepath.Join(tempDir, "config.json")
-	cm := &Manager{configPath: configPath}
+	cm, tempDir := setupTestSession(t)
 
 	// Initially no sessions
 	hasActive, err := cm.HasActiveLocalSessions()
@@ -209,19 +219,15 @@ func TestHasActiveLocalSessions(t *testing.T) {
 // For any valid alias, executing `apimgr switch -l <alias>` should update Claude Code settings files
 // with the configuration values from the specified alias
 func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
-	// Create a fake home directory for Claude settings
-	fakeHome := filepath.Join(tempDir, "home")
+	// Setup Claude environment
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
 	claudeDir := filepath.Join(fakeHome, ".claude")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		t.Fatalf("Failed to create claude dir: %v", err)
-	}
+	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 
 	// Create initial Claude settings file
 	initialSettings := map[string]interface{}{
@@ -230,15 +236,9 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 		},
 	}
 	initialData, _ := json.MarshalIndent(initialSettings, "", "  ")
-	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 	if err := os.WriteFile(claudeSettingsPath, initialData, 0600); err != nil {
 		t.Fatalf("Failed to write initial claude settings: %v", err)
 	}
-
-	// Override HOME for this test
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", fakeHome)
-	defer os.Setenv("HOME", originalHome)
 
 	// Property: For any valid API config, SyncClaudeSettingsOnly should update Claude Code settings
 	// with the correct environment variables
@@ -248,22 +248,22 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 		if len(apiKeyBytes) > 0 && apiKeyBytes[0]%2 == 0 {
 			apiKey = "sk-test-" + strconv.Itoa(int(apiKeyBytes[0]))
 		}
-		
+
 		authToken := ""
 		if len(authTokenBytes) > 0 && authTokenBytes[0]%2 == 0 {
 			authToken = "token-" + strconv.Itoa(int(authTokenBytes[0]))
 		}
-		
+
 		// At least one auth method must be present
 		if apiKey == "" && authToken == "" {
 			apiKey = "sk-default-key"
 		}
-		
+
 		baseURL := ""
 		if len(baseURLSuffix) > 0 && baseURLSuffix[0]%2 == 0 {
 			baseURL = "https://api-" + strconv.Itoa(int(baseURLSuffix[0])) + ".example.com"
 		}
-		
+
 		model := ""
 		if len(modelBytes) > 0 && modelBytes[0]%2 == 0 {
 			model = "claude-" + strconv.Itoa(int(modelBytes[0]%10))
@@ -375,29 +375,21 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 	}
 }
 
+
 // Feature: switch-local-mode-fix, Property 11: Load-active restores to global when sessions exist
 // Validates: Requirements 4.1, 4.2
 // For any state where active local sessions exist, executing `apimgr load-active` should restore
 // Claude Code settings to match the global active configuration
 func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
-	// Create a fake home directory for Claude settings
-	fakeHome := filepath.Join(tempDir, "home")
+	// Setup Claude environment
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
 	claudeDir := filepath.Join(fakeHome, ".claude")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		t.Fatalf("Failed to create claude dir: %v", err)
-	}
-
-	// Override HOME for this test
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", fakeHome)
-	defer os.Setenv("HOME", originalHome)
+	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 
 	// Property: For any global active configuration, RestoreClaudeToGlobal should sync it to Claude Code
 	property := func(apiKeyNum, authTokenNum uint8) bool {
@@ -412,7 +404,6 @@ func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 			},
 		}
 		localData, _ := json.MarshalIndent(localSettings, "", "  ")
-		claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 		if err := os.WriteFile(claudeSettingsPath, localData, 0600); err != nil {
 			t.Logf("Failed to write local claude settings: %v", err)
 			return false
@@ -518,19 +509,15 @@ func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 
 // Test RestoreClaudeToGlobal clears settings when no global active exists
 func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
-	// Create a fake home directory for Claude settings
-	fakeHome := filepath.Join(tempDir, "home")
+	// Setup Claude environment
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
 	claudeDir := filepath.Join(fakeHome, ".claude")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		t.Fatalf("Failed to create claude dir: %v", err)
-	}
+	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 
 	// Create Claude settings file with local config
 	localSettings := map[string]interface{}{
@@ -543,15 +530,9 @@ func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 		},
 	}
 	localData, _ := json.MarshalIndent(localSettings, "", "  ")
-	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
 	if err := os.WriteFile(claudeSettingsPath, localData, 0600); err != nil {
 		t.Fatalf("Failed to write local claude settings: %v", err)
 	}
-
-	// Override HOME for this test
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", fakeHome)
-	defer os.Setenv("HOME", originalHome)
 
 	// Create config file with NO global active configuration
 	configPath := filepath.Join(tempDir, "config.json")
@@ -568,7 +549,7 @@ func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 	cm := &Manager{configPath: configPath}
 
 	// Restore Claude to global (should clear ANTHROPIC_* vars)
-	err = cm.RestoreClaudeToGlobal()
+	err := cm.RestoreClaudeToGlobal()
 	if err != nil {
 		t.Fatalf("RestoreClaudeToGlobal failed: %v", err)
 	}
@@ -609,18 +590,13 @@ func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 	}
 }
 
-
 // Feature: switch-local-mode-fix, Property 13: Load-active cleans up stale sessions
 // Validates: Requirements 4.3
 // For any session marker files with non-existent PIDs, executing `apimgr load-active` should delete
 // those stale session files
 func TestPropertyStaleSessionCleanup(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	_, tempDir := setupTestSession(t)
 
 	// Property: For any number of stale session files (with non-existent PIDs),
 	// HasActiveLocalSessions should clean them all up
@@ -693,23 +669,17 @@ func TestPropertyStaleSessionCleanup(t *testing.T) {
 	}
 }
 
+
 // Feature: switch-local-mode-fix, Property 13 (additional): Mixed active and stale sessions
 // Validates: Requirements 4.3
 // When there are both active and stale sessions, only stale sessions should be cleaned up
 func TestPropertyMixedSessionCleanup(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	configPath := filepath.Join(tempDir, "config.json")
-	cm := &Manager{configPath: configPath}
+	// Use t.TempDir() for automatic cleanup
+	cm, tempDir := setupTestSession(t)
 
 	// Create an active session marker with current process PID (which is running)
 	currentPID := strconv.Itoa(os.Getpid())
-	err = cm.CreateSessionMarker(currentPID, "active-alias")
+	err := cm.CreateSessionMarker(currentPID, "active-alias")
 	if err != nil {
 		t.Fatalf("Failed to create active session marker: %v", err)
 	}
@@ -758,18 +728,13 @@ func TestPropertyMixedSessionCleanup(t *testing.T) {
 	cm.CleanupSession(currentPID)
 }
 
-
 // Feature: switch-local-mode-fix, Property 14: Cleanup-session removes marker
 // Validates: Requirements 4.1
 // For any valid PID, executing `apimgr cleanup-session <pid>` should delete the corresponding
 // session marker file
 func TestPropertyCleanupSessionRemovesMarker(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	_, tempDir := setupTestSession(t)
 
 	// Property: For any valid PID with an existing session marker,
 	// CleanupSession should remove the marker file
@@ -831,12 +796,8 @@ func TestPropertyCleanupSessionRemovesMarker(t *testing.T) {
 // Validates: Requirements 4.1
 // For any PID without an existing session marker, CleanupSession should not error
 func TestPropertyCleanupSessionNonExistent(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "apimgr-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	_, tempDir := setupTestSession(t)
 
 	// Property: For any PID without an existing session marker,
 	// CleanupSession should complete without error

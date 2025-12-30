@@ -72,12 +72,8 @@ func TestShellDetection(t *testing.T) {
 
 // TestRCFileModification tests that the RC file is correctly modified
 func TestRCFileModification(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "apimgr-install-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
 	rcFile := filepath.Join(tempDir, ".zshrc")
 
@@ -129,12 +125,8 @@ fi
 
 // TestDuplicateDetection tests that duplicate installations are detected
 func TestDuplicateDetection(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "apimgr-install-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
 	rcFile := filepath.Join(tempDir, ".zshrc")
 
@@ -192,12 +184,8 @@ fi
 
 // TestOldVersionDetection tests detection of old version installation
 func TestOldVersionDetection(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "apimgr-install-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	// Use t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 
 	rcFile := filepath.Join(tempDir, ".zshrc")
 
