@@ -50,7 +50,7 @@ Examples:
   # Non-interactive edit multiple fields
   apimgr edit myconfig --url https://api.anthropic.com --model claude-3-opus-20240229`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		alias := args[0]
 
 		// Check if any flags are provided for non-interactive editing
@@ -78,13 +78,15 @@ Examples:
 			updates["model"] = modelFlag
 		}
 
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 
 		if len(updates) > 0 {
 			// Non-interactive mode: directly apply changes
 			if err := saveAndApplyChanges(configManager, alias, updates); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			// Show success message with updated alias
@@ -96,10 +98,10 @@ Examples:
 		} else {
 			// Interactive mode: guide user through editing
 			if err := editConfig(alias); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 		}
+		return nil
 	},
 }
 
@@ -120,12 +122,15 @@ const (
 )
 
 func editConfig(alias string) error {
-	configManager := config.NewConfigManager()
+	configManager, err := config.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize config manager: %w", err)
+	}
 
 	// Get the current configuration
 	currentConfig, err := configManager.Get(alias)
 	if err != nil {
-		return fmt.Errorf("Failed to get configuration: %v", err)
+		return fmt.Errorf("failed to get configuration: %w", err)
 	}
 
 	// Display current configuration

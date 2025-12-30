@@ -28,19 +28,21 @@ Using -l/--local parameter switches configuration only in current shell session 
   apimgr switch -l <alias>
   eval "$(apimgr switch -l <alias>)"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		alias := args[0]
 
 		// Read the local flag
 		local, _ := cmd.Flags().GetBool("local")
 
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 
 		// Get the configuration first (needed for both modes)
 		apiConfig, err := configManager.Get(alias)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if local {
@@ -62,10 +64,8 @@ Using -l/--local parameter switches configuration only in current shell session 
 		} else {
 			// Global mode: update global configuration
 			// Set the active configuration
-			err := configManager.SetActive(alias)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+			if err := configManager.SetActive(alias); err != nil {
+				return err
 			}
 
 			// Generate active.env script for auto-loading
@@ -99,12 +99,12 @@ Using -l/--local parameter switches configuration only in current shell session 
 		}
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
 
-		// Print success message to stderr so it doesn't interfere with eval
 		if local {
 			fmt.Fprintf(os.Stderr, "✓ Switched to configuration locally: %s\n", alias)
 		} else {
 			fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
 		}
+		return nil
 	},
 }
 

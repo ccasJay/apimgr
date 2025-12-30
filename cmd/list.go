@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"apimgr/config"
 	"apimgr/internal/utils"
@@ -17,17 +16,19 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all API configurations",
 	Long:  "List all saved API configurations",
-	Run: func(cmd *cobra.Command, args []string) {
-		configManager := config.NewConfigManager()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		configs, err := configManager.List()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if len(configs) == 0 {
 			fmt.Println("No configurations available")
-			return
+			return nil
 		}
 
 		// Get active configuration name
@@ -56,5 +57,6 @@ var listCmd = &cobra.Command{
 		if activeName != "" {
 			fmt.Printf("\n* indicates the currently active configuration\n")
 		}
+		return nil
 	},
 }

@@ -47,24 +47,26 @@ var pingCmd = &cobra.Command{
    apimgr ping -T --stream [alias]  # Include streaming test
    apimgr ping -T -v [alias]        # Verbose output`,
 	Args: cobra.MaximumNArgs(1),
-	Run:  runPingCommand,
+	RunE: runPingCommand,
 }
 
-func runPingCommand(cmd *cobra.Command, args []string) {
-	configManager := config.NewConfigManager()
+func runPingCommand(cmd *cobra.Command, args []string) error {
+	configManager, err := config.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to initialize config manager: %w", err)
+	}
 
 	// If -T flag is set, use the compatibility tester
 	if testRealAPI {
-		runCompatibilityTest(cmd, args, configManager)
-		return
+		return runCompatibilityTest(cmd, args, configManager)
 	}
 
 	// Original ping logic for basic connectivity test
-	runBasicConnectivityTest(cmd, args, configManager)
+	return runBasicConnectivityTest(cmd, args, configManager)
 }
 
 // runCompatibilityTest runs the full API compatibility test using the compatibility package
-func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *config.Manager) {
+func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *config.Manager) error {
 	var cfg *config.APIConfig
 	var err error
 	var alias string
@@ -72,22 +74,19 @@ func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *conf
 	// Determine which configuration to test
 	isCustomURL := cmd.Flags().Lookup("url").Changed
 	if isCustomURL {
-		fmt.Fprintf(os.Stderr, "❌ Error: -T flag cannot be used with custom URL (-u)\n")
-		os.Exit(1)
+		return fmt.Errorf("-T flag cannot be used with custom URL (-u)")
 	}
 
 	if len(args) == 1 {
 		alias = args[0]
 		cfg, err = configManager.Get(alias)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 	} else {
 		cfg, err = configManager.GetActive()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 		alias = cfg.Alias
 	}
@@ -112,10 +111,8 @@ func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *conf
 				"success": false,
 			})
 			fmt.Println(string(errData))
-		} else {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 		}
-		os.Exit(1)
+		return err
 	}
 
 	// Run the compatibility test
@@ -127,10 +124,8 @@ func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *conf
 				"success": false,
 			})
 			fmt.Println(string(errData))
-		} else {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 		}
-		os.Exit(1)
+		return err
 	}
 
 	// Create reporter and output results
@@ -141,17 +136,19 @@ func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *conf
 	)
 
 	if err := reporter.Report(result); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error reporting results: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error reporting results: %w", err)
 	}
 
 	// Determine exit code based on compatibility level
 	_, exitCode := compatibility.DetermineCompatibilityLevel(result.Checks)
-	os.Exit(exitCode)
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
+	return nil
 }
 
 // runBasicConnectivityTest runs the original basic connectivity test
-func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *config.Manager) {
+func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *config.Manager) error {
 	var baseURL string
 
 	// Decide which URL to test
@@ -167,8 +164,7 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 		alias := args[0]
 		cfg, err := configManager.Get(alias)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 		baseURL = cfg.BaseURL
 		// Apply URL normalization for configured API
@@ -183,8 +179,7 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 		// Active configuration mode
 		cfg, err := configManager.GetActive()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 		baseURL = cfg.BaseURL
 		// Apply URL normalization for configured API
@@ -220,16 +215,13 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 	if !utils.ValidateURL(baseURL) {
 		if outputJSON {
 			errData, _ := json.Marshal(map[string]interface{}{
-				"error":   "Invalid URL format",
+				"error":   "invalid URL format",
 				"url":     baseURL,
 				"success": false,
 			})
 			fmt.Println(string(errData))
-		} else {
-			fmt.Fprintf(os.Stderr, "❌ Error: Invalid URL format: %s\n", baseURL)
-			fmt.Fprintln(os.Stderr, "URL must include http or https protocol and valid hostname")
 		}
-		os.Exit(1)
+		return fmt.Errorf("invalid URL format: %s (URL must include http or https protocol and valid hostname)", baseURL)
 	}
 
 	// Add auth headers for configured API (not for custom URL mode)
@@ -274,10 +266,8 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 				"success": false,
 			})
 			fmt.Println(string(errData))
-		} else {
-			fmt.Fprintf(os.Stderr, "❌ Error: Failed to create request: %v\n", err)
 		}
-		os.Exit(1)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set Content-Type header (if needed)
@@ -342,10 +332,8 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 				"success": false,
 			})
 			fmt.Println(string(errData))
-		} else {
-			fmt.Fprintf(os.Stderr, "❌ Connection failed: %s\n", errMsg)
 		}
-		os.Exit(1)
+		return fmt.Errorf("connection failed: %s", errMsg)
 	}
 	defer resp.Body.Close()
 
@@ -386,6 +374,7 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 			fmt.Printf("   - Try using this configuration in actual scenarios\n")
 		}
 	}
+	return nil
 }
 
 func init() {

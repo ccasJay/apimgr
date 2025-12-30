@@ -67,8 +67,8 @@ func TestValidateConfig(t *testing.T) {
 
 	// Test empty alias
 	err := cm.validateConfig(APIConfig{Alias: "", APIKey: "key"})
-	if err == nil || err.Error() != "Alias cannot be empty" {
-		t.Errorf("Expected 'Alias cannot be empty' error, got: %v", err)
+	if err == nil || err.Error() != "alias cannot be empty" {
+		t.Errorf("Expected 'alias cannot be empty' error, got: %v", err)
 	}
 
 	// Test missing authentication
@@ -89,8 +89,8 @@ func TestValidateConfig(t *testing.T) {
 		APIKey:  "sk-test",
 		BaseURL: "invalid-url",
 	})
-	if err == nil || err.Error() != "Invalid URL format: invalid-url" {
-		t.Errorf("Expected 'Invalid URL format' error, got: %v", err)
+	if err == nil || err.Error() != "invalid URL format: invalid-url" {
+		t.Errorf("Expected 'invalid URL format' error, got: %v", err)
 	}
 
 	// Test valid config

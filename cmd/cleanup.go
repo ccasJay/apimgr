@@ -23,7 +23,11 @@ Users typically do not need to call this command directly.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		pid := args[0]
-		configManager := config.NewConfigManager()
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			// Silently exit - this is called during shell exit
+			os.Exit(0)
+		}
 
 		if err := configManager.CleanupSession(pid); err != nil {
 			// Log error but don't fail - this is called during shell exit

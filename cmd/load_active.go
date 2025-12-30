@@ -16,8 +16,11 @@ var loadActiveCmd = &cobra.Command{
 	Use:   "load-active",
 	Short: "Load global active configuration (for shell initialization)",
 	Long:  "This command is used in shell initialization scripts to load the global active configuration and restore Claude Code settings if needed. Use: eval \"$(apimgr load-active)\"",
-	Run: func(cmd *cobra.Command, args []string) {
-		configManager := config.NewConfigManager()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 
 		// Check for active local sessions and clean up stale ones
 		// This also restores Claude Code to global config if there are active sessions
@@ -43,7 +46,7 @@ var loadActiveCmd = &cobra.Command{
 			fmt.Println("unset ANTHROPIC_BASE_URL")
 			fmt.Println("unset ANTHROPIC_MODEL")
 			fmt.Println("unset APIMGR_ACTIVE")
-			return
+			return nil
 		}
 
 		// Output unset commands first to clear any stale env vars
@@ -67,5 +70,6 @@ var loadActiveCmd = &cobra.Command{
 			fmt.Printf("export ANTHROPIC_MODEL=\"%s\"\n", apiConfig.Model)
 		}
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", apiConfig.Alias)
+		return nil
 	},
 }

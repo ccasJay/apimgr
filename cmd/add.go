@@ -165,13 +165,15 @@ var addCmd = &cobra.Command{
    apimgr add --sk sk-xxx -u https://api.anthropic.com -m claude-3
    apimgr add --ak bearer-token`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		configManager := config.NewConfigManager()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configManager, err := config.NewConfigManager()
+		if err != nil {
+			return fmt.Errorf("failed to initialize config manager: %w", err)
+		}
 		collector := &InputCollector{}
 
 		// Determine input mode
 		var cfg *config.APIConfig
-		var err error
 
 		hasSK := cmd.Flags().Lookup("sk").Changed
 		hasAK := cmd.Flags().Lookup("ak").Changed
@@ -264,6 +266,7 @@ var addCmd = &cobra.Command{
 
 		fmt.Printf("✅ Configuration added: %s\n", cfg.Alias)
 		fmt.Println("\n💡 Tip: Run 'apimgr switch <alias>' to switch to this configuration")
+		return nil
 	},
 }
 

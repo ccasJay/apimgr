@@ -39,10 +39,10 @@ type Manager struct {
 }
 
 // NewConfigManager creates a new Manager with unified config path
-func NewConfigManager() *Manager {
+func NewConfigManager() (*Manager, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get user home directory: %v", err))
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
 	// Check XDG_CONFIG_HOME environment variable for custom config location
@@ -61,7 +61,7 @@ func NewConfigManager() *Manager {
 	// Ensure XDG directory exists
 	configDir := filepath.Dir(xdgConfigPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		panic(fmt.Sprintf("Failed to create config directory: %v", err))
+		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Migrate from old config if it exists and new config doesn't
@@ -76,7 +76,7 @@ func NewConfigManager() *Manager {
 
 	return &Manager{
 		configPath: configPath,
-	}
+	}, nil
 }
 
 // shouldMigrateConfig checks if config migration should be performed
@@ -91,11 +91,11 @@ func shouldMigrateConfig(oldPath, newPath string) bool {
 func migrateConfig(oldPath, newPath string) error {
 	data, err := os.ReadFile(oldPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read old config file: %v", err)
+		return fmt.Errorf("failed to read old config file: %w", err)
 	}
 
 	if len(data) == 0 {
-		return fmt.Errorf("Old config file is empty")
+		return fmt.Errorf("old config file is empty")
 	}
 
 	// Validate that it's a valid config
@@ -104,42 +104,42 @@ func migrateConfig(oldPath, newPath string) error {
 		// Try old format (array of configs)
 		var tempConfigs []APIConfig
 		if err2 := json.Unmarshal(data, &tempConfigs); err2 != nil {
-			return fmt.Errorf("Old config file format is invalid: %v", err)
+			return fmt.Errorf("old config file format is invalid: %w", err)
 		}
 	}
 
 	// Write to new location with locking
 	file, err := os.OpenFile(newPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("Failed to open new config file: %v", err)
+		return fmt.Errorf("failed to open new config file: %w", err)
 	}
 
 	// Lock the new config file exclusively
 	if err := lockFileExclusive(file); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to lock new config file: %v", err)
+		return fmt.Errorf("failed to lock new config file: %w", err)
 	}
 
 	// Write data while holding the lock
 	_, err = file.Write(data)
 	if err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to write new config file: %v", err)
+		return fmt.Errorf("failed to write new config file: %w", err)
 	}
 
 	// Ensure data is flushed
 	if err := file.Sync(); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to sync new config file to disk: %v", err)
+		return fmt.Errorf("failed to sync new config file to disk: %w", err)
 	}
 
 	// Unlock and close
 	if err := unlockFile(file); err != nil {
 		file.Close()
-		return fmt.Errorf("Failed to unlock new config file: %v", err)
+		return fmt.Errorf("failed to unlock new config file: %w", err)
 	}
 	if err := file.Close(); err != nil {
-		return fmt.Errorf("Failed to close new config file: %v", err)
+		return fmt.Errorf("failed to close new config file: %w", err)
 	}
 
 	// Backup old config
@@ -171,13 +171,13 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 		if os.IsNotExist(err) {
 			return &File{Configs: []APIConfig{}}, nil
 		}
-		return nil, fmt.Errorf("Failed to open config file: %v", err)
+		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
 	defer file.Close()
 
 	// Lock the file for shared read access (LOCK_SH)
 	if err := cm.lockFileShared(file); err != nil {
-		return nil, fmt.Errorf("Failed to lock config file: %v", err)
+		return nil, fmt.Errorf("failed to lock config file: %w", err)
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
@@ -188,7 +188,7 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 	// Read from the locked file descriptor instead of using os.ReadFile
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read config file: %v", err)
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	if len(data) == 0 {
@@ -203,7 +203,7 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 		if err2 := json.Unmarshal(data, &configs); err2 == nil {
 			return &File{Configs: configs}, nil
 		}
-		return nil, fmt.Errorf("Failed to parse config file: %v", err)
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	return &configFile, nil
@@ -213,19 +213,19 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 func (cm *Manager) saveConfigFile(configFile *File) error {
 	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Failed to serialize config: %v", err)
+		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
 	// Open the file with write access (create if not exists)
 	file, err := os.OpenFile(cm.configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("Failed to open config file: %v", err)
+		return fmt.Errorf("failed to open config file: %w", err)
 	}
 	defer file.Close()
 
 	// Lock the file for exclusive write access
 	if err := cm.lockFile(file); err != nil {
-		return fmt.Errorf("Failed to lock config file: %v", err)
+		return fmt.Errorf("failed to lock config file: %w", err)
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
@@ -236,12 +236,12 @@ func (cm *Manager) saveConfigFile(configFile *File) error {
 	// Write the file while holding the lock
 	_, err = file.Write(data)
 	if err != nil {
-		return fmt.Errorf("Failed to write config file: %v", err)
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	// Ensure data is flushed to disk
 	if err := file.Sync(); err != nil {
-		return fmt.Errorf("Failed to sync config file: %v", err)
+		return fmt.Errorf("failed to sync config file: %w", err)
 	}
 
 	return nil
@@ -411,7 +411,7 @@ func (cm *Manager) GetActive() (*APIConfig, error) {
 	}
 
 	if configFile.Active == "" {
-		return nil, fmt.Errorf("No active configuration set")
+		return nil, fmt.Errorf("no active configuration set")
 	}
 
 	for _, config := range configFile.Configs {
@@ -438,7 +438,7 @@ func (cm *Manager) GetActiveName() (string, error) {
 // validateConfig validates a configuration
 func (cm *Manager) validateConfig(config APIConfig) error {
 	if config.Alias == "" {
-		return fmt.Errorf("Alias cannot be empty")
+		return fmt.Errorf("alias cannot be empty")
 	}
 
 	// Default provider is anthropic
@@ -455,7 +455,7 @@ func (cm *Manager) validateConfig(config APIConfig) error {
 	// Validate provider
 	provider, err := providers.Get(providerName)
 	if err != nil {
-		return fmt.Errorf("Unknown API provider: %s", providerName)
+		return fmt.Errorf("unknown API provider: %s", providerName)
 	}
 
 	// Provider-specific validation
@@ -466,7 +466,7 @@ func (cm *Manager) validateConfig(config APIConfig) error {
 	// URL format validation
 	if config.BaseURL != "" {
 		if !utils.ValidateURL(config.BaseURL) {
-			return fmt.Errorf("Invalid URL format: %s", config.BaseURL)
+			return fmt.Errorf("invalid URL format: %s", config.BaseURL)
 		}
 	}
 
