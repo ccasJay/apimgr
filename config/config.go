@@ -18,18 +18,28 @@ import (
 
 // APIConfig represents a single API configuration
 type APIConfig struct {
-	Alias     string `json:"alias"`
-	Provider  string `json:"provider"` // API provider type
-	APIKey    string `json:"api_key"`
-	AuthToken string `json:"auth_token"`
-	BaseURL   string `json:"base_url"`
-	Model     string `json:"model"`
+	Alias     string   `json:"alias"`
+	Provider  string   `json:"provider"` // API provider type
+	APIKey    string   `json:"api_key"`
+	AuthToken string   `json:"auth_token"`
+	BaseURL   string   `json:"base_url"`
+	Model     string   `json:"model"`            // Currently active model
+	Models    []string `json:"models,omitempty"` // Supported models list
 }
 
 // File represents the structure of the config file
 type File struct {
 	Active  string      `json:"active"`
 	Configs []APIConfig `json:"configs"`
+}
+
+// normalizeModels ensures backward compatibility for configs loaded without models field.
+// If models field is empty but model field has a value, populate models from model.
+// If model field is empty, models list remains empty.
+func normalizeModels(config *APIConfig) {
+	if len(config.Models) == 0 && config.Model != "" {
+		config.Models = []string{config.Model}
+	}
 }
 
 // Manager manages API configurations
@@ -201,9 +211,18 @@ func (cm *Manager) loadConfigFile() (*File, error) {
 		// Try to parse as old format (array of configs)
 		var configs []APIConfig
 		if err2 := json.Unmarshal(data, &configs); err2 == nil {
+			// Normalize models for backward compatibility
+			for i := range configs {
+				normalizeModels(&configs[i])
+			}
 			return &File{Configs: configs}, nil
 		}
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Normalize models for backward compatibility
+	for i := range configFile.Configs {
+		normalizeModels(&configFile.Configs[i])
 	}
 
 	return &configFile, nil
@@ -1010,4 +1029,107 @@ func (cm *Manager) clearProjectClaudeSettings() error {
 	}
 
 	return nil
+}
+
+// SwitchModel switches the active model for a configuration.
+// It validates that the model is in the supported models list before switching.
+// Requirements: 2.1
+func (cm *Manager) SwitchModel(alias string, model string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return err
+	}
+
+	// Find the configuration by alias
+	for i, config := range configFile.Configs {
+		if config.Alias == alias {
+			// Validate model is in supported list
+			validator := NewModelValidator()
+			if err := validator.ValidateModelInList(model, config.Models); err != nil {
+				return err
+			}
+
+			// Update active model
+			configFile.Configs[i].Model = model
+
+			// Save configuration
+			return cm.saveConfigFile(configFile)
+		}
+	}
+
+	return fmt.Errorf("configuration '%s' does not exist", alias)
+}
+
+// GetModels returns the supported models list for a configuration.
+// Requirements: 4.1
+func (cm *Manager) GetModels(alias string) ([]string, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, config := range configFile.Configs {
+		if config.Alias == alias {
+			// Return a copy to prevent external modification
+			result := make([]string, len(config.Models))
+			copy(result, config.Models)
+			return result, nil
+		}
+	}
+
+	return nil, fmt.Errorf("configuration '%s' does not exist", alias)
+}
+
+// SetModels updates the supported models list for a configuration.
+// It validates the models list and handles active model fallback when the current active model is removed.
+// Requirements: 4.1, 4.2, 4.3
+func (cm *Manager) SetModels(alias string, models []string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// Validate and normalize the models list
+	validator := NewModelValidator()
+	normalizedModels := validator.NormalizeModels(models)
+	if err := validator.ValidateModelsList(normalizedModels); err != nil {
+		return err
+	}
+
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return err
+	}
+
+	// Find the configuration by alias
+	for i, config := range configFile.Configs {
+		if config.Alias == alias {
+			// Update models list
+			configFile.Configs[i].Models = normalizedModels
+
+			// Handle active model fallback when removed
+			// Check if current active model is still in the new list
+			activeModelInList := false
+			for _, m := range normalizedModels {
+				if m == config.Model {
+					activeModelInList = true
+					break
+				}
+			}
+
+			// If active model is not in the new list, fallback to first model
+			if !activeModelInList && len(normalizedModels) > 0 {
+				configFile.Configs[i].Model = normalizedModels[0]
+			}
+
+			// Save configuration
+			return cm.saveConfigFile(configFile)
+		}
+	}
+
+	return fmt.Errorf("configuration '%s' does not exist", alias)
 }

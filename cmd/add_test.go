@@ -39,6 +39,7 @@ func TestAddCmd(t *testing.T) {
 			{"ak", ""},
 			{"url", "u"},
 			{"model", "m"},
+			{"models", ""},
 		}
 
 		for _, f := range flags {
@@ -125,6 +126,93 @@ func TestAPIConfigBuilder(t *testing.T) {
 		_, err := builder.Build()
 		if err == nil {
 			t.Error("Build() should return error for invalid URL")
+		}
+	})
+
+	t.Run("Build with models list", func(t *testing.T) {
+		models := []string{"claude-3-opus", "claude-3-sonnet", "gpt-4"}
+		builder := NewAPIConfigBuilder().
+			SetAlias("test-alias").
+			SetAPIKey("sk-test-key").
+			SetModel("claude-3-opus").
+			SetModels(models)
+
+		cfg, err := builder.Build()
+		if err != nil {
+			t.Fatalf("Build() error = %v, want nil", err)
+		}
+
+		if cfg.Model != "claude-3-opus" {
+			t.Errorf("Model = %q, want %q", cfg.Model, "claude-3-opus")
+		}
+		if len(cfg.Models) != 3 {
+			t.Errorf("len(Models) = %d, want 3", len(cfg.Models))
+		}
+		for i, expected := range models {
+			if cfg.Models[i] != expected {
+				t.Errorf("Models[%d] = %q, want %q", i, cfg.Models[i], expected)
+			}
+		}
+	})
+}
+
+func TestParseModelsList(t *testing.T) {
+	t.Run("Parse comma-separated models", func(t *testing.T) {
+		result := parseModelsList("claude-3-opus,claude-3-sonnet,gpt-4")
+		expected := []string{"claude-3-opus", "claude-3-sonnet", "gpt-4"}
+
+		if len(result) != len(expected) {
+			t.Fatalf("len(result) = %d, want %d", len(result), len(expected))
+		}
+		for i, v := range expected {
+			if result[i] != v {
+				t.Errorf("result[%d] = %q, want %q", i, result[i], v)
+			}
+		}
+	})
+
+	t.Run("Parse with whitespace", func(t *testing.T) {
+		result := parseModelsList("  claude-3-opus , claude-3-sonnet , gpt-4  ")
+		expected := []string{"claude-3-opus", "claude-3-sonnet", "gpt-4"}
+
+		if len(result) != len(expected) {
+			t.Fatalf("len(result) = %d, want %d", len(result), len(expected))
+		}
+		for i, v := range expected {
+			if result[i] != v {
+				t.Errorf("result[%d] = %q, want %q", i, result[i], v)
+			}
+		}
+	})
+
+	t.Run("Parse empty string", func(t *testing.T) {
+		result := parseModelsList("")
+		if len(result) != 0 {
+			t.Errorf("len(result) = %d, want 0", len(result))
+		}
+	})
+
+	t.Run("Parse single model", func(t *testing.T) {
+		result := parseModelsList("claude-3-opus")
+		if len(result) != 1 {
+			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+		if result[0] != "claude-3-opus" {
+			t.Errorf("result[0] = %q, want %q", result[0], "claude-3-opus")
+		}
+	})
+
+	t.Run("Parse with empty entries", func(t *testing.T) {
+		result := parseModelsList("claude-3-opus,,gpt-4,")
+		expected := []string{"claude-3-opus", "gpt-4"}
+
+		if len(result) != len(expected) {
+			t.Fatalf("len(result) = %d, want %d", len(result), len(expected))
+		}
+		for i, v := range expected {
+			if result[i] != v {
+				t.Errorf("result[%d] = %q, want %q", i, result[i], v)
+			}
 		}
 	})
 }

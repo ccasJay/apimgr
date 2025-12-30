@@ -31,7 +31,7 @@ func TestEditCmd(t *testing.T) {
 	})
 
 	t.Run("Flags are defined", func(t *testing.T) {
-		flags := []string{"alias", "sk", "ak", "url", "model"}
+		flags := []string{"alias", "sk", "ak", "url", "model", "models"}
 
 		for _, name := range flags {
 			flag := editCmd.Flags().Lookup(name)
@@ -74,6 +74,7 @@ func TestFieldType(t *testing.T) {
 			{FieldAuthToken, 2},
 			{FieldBaseURL, 3},
 			{FieldModel, 4},
+			{FieldModels, 5},
 		}
 
 		for _, tt := range tests {
@@ -95,6 +96,7 @@ func TestGetFieldKey(t *testing.T) {
 		{"FieldAuthToken", FieldAuthToken, "auth_token"},
 		{"FieldBaseURL", FieldBaseURL, "base_url"},
 		{"FieldModel", FieldModel, "model"},
+		{"FieldModels", FieldModels, "models"},
 	}
 
 	for _, tt := range tests {
@@ -118,6 +120,7 @@ func TestIsSensitiveField(t *testing.T) {
 		{"FieldAuthToken is sensitive", FieldAuthToken, true},
 		{"FieldBaseURL is not sensitive", FieldBaseURL, false},
 		{"FieldModel is not sensitive", FieldModel, false},
+		{"FieldModels is not sensitive", FieldModels, false},
 	}
 
 	for _, tt := range tests {
