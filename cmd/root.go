@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"apimgr/internal/tui"
+
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +25,11 @@ var rootCmd = &cobra.Command{
 	Short: "API key and model configuration management tool",
 	Long:  "A command line tool for managing Anthropic API keys and model configurations",
 	// Version information will be set in the Execute function
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// When no subcommand is provided, launch the TUI interface
+		// Requirements: 1.1, 1.4
+		return tui.Run()
+	},
 }
 
 // Execute executes the root command
