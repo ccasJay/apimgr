@@ -15,6 +15,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// SwitchType represents the type of switch operation
+type SwitchType int
+
+const (
+	SwitchTypeNone SwitchType = iota
+	SwitchTypeLocal
+	SwitchTypeGlobal
+)
+
 // ViewState represents the current view state
 type ViewState int
 
@@ -67,6 +76,7 @@ type Model struct {
 	// Model selection state
 	modelCursor int      // Cursor position in model selection list
 	modelList   []string // Available models for current config
+	switchType  SwitchType // Current switch type (local or global)
 
 	// Help view scroll state
 	helpScrollOffset int // Scroll offset for help view
@@ -110,6 +120,7 @@ func NewModel(cm *config.Manager) Model {
 		height:            24,
 		scrollOffset:      0,
 		modelScrollOffset: 0,
+		switchType:        SwitchTypeNone,
 	}
 }
 
@@ -350,18 +361,54 @@ func (m Model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear previous messages
 			m.message = ""
 			m.errorMsg = ""
-			return m, switchLocalConfig(m.configManager, &cfg)
+
+			// Check if config supports multiple models
+			if len(cfg.Models) > 1 {
+				// Initialize model selection for local switch
+				m.initModelSelect(cfg)
+				m.modelCursor = 0
+				// Find current active model position
+				for i, model := range cfg.Models {
+					if model == cfg.Model {
+						m.modelCursor = i
+						break
+					}
+				}
+				m.switchType = SwitchTypeLocal
+				return m, nil
+			} else {
+				// Single model config, switch directly
+				return m, switchLocalConfig(m.configManager, &cfg)
+			}
 		}
 		return m, nil
 
 	case "S":
 		// Switch global active config - Requirements: 4.1, 4.2, 4.3, 4.4
 		if len(m.configs) > 0 && m.cursor >= 0 && m.cursor < len(m.configs) {
-			alias := m.configs[m.cursor].Alias
+			cfg := m.configs[m.cursor]
 			// Clear previous messages
 			m.message = ""
 			m.errorMsg = ""
-			return m, switchGlobalConfig(m.configManager, alias)
+
+			// Check if config supports multiple models
+			if len(cfg.Models) > 1 {
+				// Initialize model selection for global switch
+				m.initModelSelect(cfg)
+				m.modelCursor = 0
+				// Find current active model position
+				for i, model := range cfg.Models {
+					if model == cfg.Model {
+						m.modelCursor = i
+						break
+					}
+				}
+				m.switchType = SwitchTypeGlobal
+				return m, nil
+			} else {
+				// Single model config, switch directly
+				return m, switchGlobalConfig(m.configManager, cfg.Alias)
+			}
 		}
 		return m, nil
 
@@ -397,9 +444,10 @@ func (m Model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			cfg := m.configs[m.cursor]
 			if len(cfg.Models) <= 1 {
 				// No multiple models to switch - Requirements: 12.4
-				m.errorMsg = "此配置没有定义多个模型可供切换"
+				m.errorMsg = "当前配置只支持单个模型，无法切换。如需添加多个模型，请编辑配置。"
 				return m, nil
 			}
+			// Initialize model selection view
 			m.initModelSelect(cfg)
 		}
 		return m, nil
@@ -446,22 +494,62 @@ func (m Model) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		// Switch local (Claude Code only) from detail view
 		if m.selected >= 0 && m.selected < len(m.configs) {
+			// Set cursor to selected for proper handling
+			m.cursor = m.selected
 			cfg := m.configs[m.selected]
 			// Clear previous messages
 			m.message = ""
 			m.errorMsg = ""
-			return m, switchLocalConfig(m.configManager, &cfg)
+
+			// Check if config supports multiple models
+			if len(cfg.Models) > 1 {
+				// Initialize model selection for local switch
+				m.initModelSelect(cfg)
+				m.modelCursor = 0
+				// Find current active model position
+				for i, model := range cfg.Models {
+					if model == cfg.Model {
+						m.modelCursor = i
+						break
+					}
+				}
+				m.switchType = SwitchTypeLocal
+				return m, nil
+			} else {
+				// Single model config, switch directly
+				return m, switchLocalConfig(m.configManager, &cfg)
+			}
 		}
 		return m, nil
 
 	case "S":
 		// Switch global active config from detail view - Requirements: 4.1, 4.2, 4.3, 4.4
 		if m.selected >= 0 && m.selected < len(m.configs) {
-			alias := m.configs[m.selected].Alias
+			// Set cursor to selected for proper handling
+			m.cursor = m.selected
+			cfg := m.configs[m.selected]
 			// Clear previous messages
 			m.message = ""
 			m.errorMsg = ""
-			return m, switchGlobalConfig(m.configManager, alias)
+
+			// Check if config supports multiple models
+			if len(cfg.Models) > 1 {
+				// Initialize model selection for global switch
+				m.initModelSelect(cfg)
+				m.modelCursor = 0
+				// Find current active model position
+				for i, model := range cfg.Models {
+					if model == cfg.Model {
+						m.modelCursor = i
+						break
+					}
+				}
+				m.switchType = SwitchTypeGlobal
+				return m, nil
+			} else {
+				// Single model config, switch directly
+				return m, switchGlobalConfig(m.configManager, cfg.Alias)
+			}
 		}
 		return m, nil
 
@@ -496,11 +584,12 @@ func (m Model) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			cfg := m.configs[m.selected]
 			if len(cfg.Models) <= 1 {
 				// No multiple models to switch - Requirements: 12.4
-				m.errorMsg = "此配置没有定义多个模型可供切换"
+				m.errorMsg = "当前配置只支持单个模型，无法切换。如需添加多个模型，请编辑配置。"
 				return m, nil
 			}
 			// Set cursor to selected for initModelSelect to work correctly
 			m.cursor = m.selected
+			// Initialize model selection view
 			m.initModelSelect(cfg)
 		}
 		return m, nil
@@ -991,6 +1080,8 @@ func (m *Model) initModelSelect(cfg config.APIConfig) {
 	m.viewState = ViewModelSelect
 	m.message = ""
 	m.errorMsg = ""
+	m.modelScrollOffset = 0 // Reset scroll offset when initializing
+	m.switchType = SwitchTypeNone // Will be set by the caller
 }
 
 // handleModelSelectViewKeys handles keyboard input in model selection view
@@ -1006,6 +1097,30 @@ func (m Model) handleModelSelectViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.modelList = nil
 		m.modelCursor = 0
 		m.modelScrollOffset = 0
+		return m, nil
+
+	case " ":
+		// Scroll down by page in model selection view
+		if m.cursor >= 0 && m.cursor < len(m.configs) && m.modelCursor >= 0 && m.modelCursor < len(m.modelList) {
+			visibleHeight := m.getVisibleModelListHeight()
+			m.modelCursor += visibleHeight
+			if m.modelCursor >= len(m.modelList) {
+				m.modelCursor = len(m.modelList) - 1
+			}
+			m.adjustModelScrollOffset()
+		}
+		return m, nil
+
+	case "shift+ ":
+		// Scroll up by page in model selection view
+		if m.cursor >= 0 && m.cursor < len(m.configs) && m.modelCursor >= 0 && m.modelCursor < len(m.modelList) {
+			visibleHeight := m.getVisibleModelListHeight()
+			m.modelCursor -= visibleHeight
+			if m.modelCursor < 0 {
+				m.modelCursor = 0
+			}
+			m.adjustModelScrollOffset()
+		}
 		return m, nil
 
 	case "j", "down":
@@ -1046,9 +1161,22 @@ func (m Model) handleModelSelectViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewState = ViewMain
 			m.modelList = nil
 			m.modelScrollOffset = 0
-			return m, switchModel(m.configManager, alias, selectedModel)
+
+			// Execute the appropriate switch based on switchType
+			switch m.switchType {
+			case SwitchTypeLocal:
+				// For local switch, we need to switch both model and sync to Claude Code
+				return m, switchModelAndSync(m.configManager, alias, selectedModel, true)
+			case SwitchTypeGlobal:
+				// For global switch, we need to switch both model and set as active
+				return m, switchModelAndSync(m.configManager, alias, selectedModel, false)
+			default:
+				// Fallback to just model switch
+				return m, switchModel(m.configManager, alias, selectedModel)
+			}
 		}
 		m.viewState = ViewMain
+		m.switchType = SwitchTypeNone // Reset switch type
 		return m, nil
 	}
 
@@ -1137,6 +1265,69 @@ func switchModel(cm *config.Manager, alias string, model string) tea.Cmd {
 			Alias: alias,
 			Model: model,
 			Err:   nil,
+		}
+	}
+}
+
+// switchModelAndSync creates a command to switch model and perform additional sync operations
+// isLocal: true for local switch (sync to Claude Code only), false for global switch (set as active)
+func switchModelAndSync(cm *config.Manager, alias string, model string, isLocal bool) tea.Cmd {
+	return func() tea.Msg {
+		// First switch the model
+		err := cm.SwitchModel(alias, model)
+		if err != nil {
+			return ModelSwitchedMsg{
+				Alias: alias,
+				Model: model,
+				Err:   err,
+			}
+		}
+
+		if isLocal {
+			// For local switch, sync to Claude Code settings immediately
+			cfg, err := cm.Get(alias)
+			if err != nil {
+				return ModelSwitchedMsg{
+					Alias: alias,
+					Model: model,
+					Err:   err,
+				}
+			}
+
+			if syncErr := cm.SyncClaudeSettingsOnly(cfg); syncErr != nil {
+				// Continue even if sync fails
+				return ModelSwitchedMsg{
+					Alias: alias,
+					Model: model,
+					Err:   nil,
+				}
+			}
+
+			return ModelSwitchedMsg{
+				Alias: alias,
+				Model: model,
+				Err:   nil,
+			}
+		} else {
+			// For global switch, set as active and sync
+			if err := cm.SetActive(alias); err != nil {
+				return ModelSwitchedMsg{
+					Alias: alias,
+					Model: model,
+					Err:   err,
+				}
+			}
+
+			// Generate active script
+			if genErr := cm.GenerateActiveScript(); genErr != nil {
+				// Continue even if script generation fails
+			}
+
+			return ModelSwitchedMsg{
+				Alias: alias,
+				Model: model,
+				Err:   nil,
+			}
 		}
 	}
 }

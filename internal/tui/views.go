@@ -535,7 +535,7 @@ func (m Model) RenderModelSelectView() string {
 	var b strings.Builder
 
 	// Title
-	b.WriteString(titleStyle.Render("选择模型"))
+	b.WriteString(titleStyle.Render("切换模型"))
 	b.WriteString("\n")
 	b.WriteString(separatorStyle.Render(strings.Repeat("─", m.getEffectiveWidth(40))))
 	b.WriteString("\n\n")
@@ -592,7 +592,9 @@ func (m Model) RenderModelSelectView() string {
 	b.WriteString("\n")
 	b.WriteString(separatorStyle.Render(strings.Repeat("─", m.getEffectiveWidth(40))))
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("j/k: 上下移动 │ Enter: 确认选择 │ Esc: 取消"))
+	b.WriteString(helpStyle.Render("j/k: 上下移动 │ 空格: 翻页 │ Enter: 确认切换 │ Esc: 取消"))
+	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render("提示: 使用空格键可以在模型列表中快速滚动"))
 
 	return b.String()
 }
