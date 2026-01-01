@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,9 @@ import (
 
 	"apimgr/internal/providers"
 	"apimgr/internal/utils"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // APIConfig represents a single API configuration
@@ -25,6 +29,156 @@ type APIConfig struct {
 	BaseURL   string   `json:"base_url"`
 	Model     string   `json:"model"`            // Currently active model
 	Models    []string `json:"models,omitempty"` // Supported models list
+}
+
+// Feature flags for experimental features
+const FeatureSurgicalUpdates = "surgical_updates_v1"
+
+// Backup constants
+const (
+	// DefaultBackupRetention is the default number of backups to keep
+	DefaultBackupRetention = 3
+)
+
+// BackupManager manages backup files for configurations
+type BackupManager struct {
+	// MaxBackups is the maximum number of backups to retain
+	MaxBackups int
+}
+
+// NewBackupManager creates a new BackupManager with default settings
+func NewBackupManager(maxBackups int) *BackupManager {
+	if maxBackups <= 0 {
+		maxBackups = DefaultBackupRetention
+	}
+	return &BackupManager{
+		MaxBackups: maxBackups,
+	}
+}
+
+// CreateBackup creates a new backup file with timestamp-PID naming format
+func (bm *BackupManager) CreateBackup(filePath string) (string, error) {
+	// Get PID for the backup filename
+	pid := syscall.Getpid()
+
+	// Create backup filename with pattern: original.backup-YYYYMMDDHHMMSS-PID
+	timestamp := time.Now().Format("20060102150405")
+	backupPath := fmt.Sprintf("%s.backup-%s-%d", filePath, timestamp, pid)
+
+	// Copy the file to create backup
+	if err := copyFile(filePath, backupPath); err != nil {
+		return "", fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	// Preserve file permissions
+	srcInfo, err := os.Stat(filePath)
+	if err != nil {
+		return backupPath, nil // Non-fatal, backup was created
+	}
+	if err := os.Chmod(backupPath, srcInfo.Mode()); err != nil {
+		return backupPath, nil // Non-fatal, backup was created
+	}
+
+	return backupPath, nil
+}
+
+// ListBackups returns a list of all backup files for the given filePath
+func (bm *BackupManager) ListBackups(filePath string) ([]string, error) {
+	// Pattern to match backup files
+	pattern := fmt.Sprintf("%s.backup-*", filePath)
+
+	// Find all matching backup files
+	backupFiles, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list backups: %w", err)
+	}
+
+	// Sort backup files by modification time (oldest first)
+	sort.Slice(backupFiles, func(i, j int) bool {
+		iInfo, err1 := os.Stat(backupFiles[i])
+		jInfo, err2 := os.Stat(backupFiles[j])
+		if err1 != nil || err2 != nil {
+			return false
+		}
+		return iInfo.ModTime().Before(jInfo.ModTime())
+	})
+
+	return backupFiles, nil
+}
+
+// CleanupOldBackups removes old backup files, retaining only the most recent MaxBackups
+func (bm *BackupManager) CleanupOldBackups(filePath string) error {
+	// Get all backup files sorted by modification time (oldest first)
+	backupFiles, err := bm.ListBackups(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Calculate how many backups to remove
+	numToRemove := len(backupFiles) - bm.MaxBackups
+	if numToRemove <= 0 {
+		return nil // No old backups to remove
+	}
+
+	// Remove old backups (from the beginning of the sorted list)
+	for _, oldBackup := range backupFiles[:numToRemove] {
+		if err := os.Remove(oldBackup); err != nil {
+			return fmt.Errorf("failed to remove old backup %s: %w", oldBackup, err)
+		}
+	}
+
+	return nil
+}
+
+// RestoreFromBackup restores the file from a specific backup path
+func (bm *BackupManager) RestoreFromBackup(filePath string, backupPath string) error {
+	// Validate the backup file path
+	pattern := fmt.Sprintf("%s.backup-*", filePath)
+	match, err := filepath.Match(pattern, backupPath)
+	if err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
+	}
+	if !match {
+		return fmt.Errorf("backup path %s is not a valid backup for %s", backupPath, filePath)
+	}
+
+	// Copy the backup to original file
+	if err := copyFile(backupPath, filePath); err != nil {
+		return fmt.Errorf("failed to restore from backup: %w", err)
+	}
+
+	// Restore file permissions
+	srcInfo, err := os.Stat(backupPath)
+	if err != nil {
+		return nil // Non-fatal, restore was successful
+	}
+	return os.Chmod(filePath, srcInfo.Mode())
+}
+
+// RestoreFromLatestBackup restores the file from the most recent backup
+func (bm *BackupManager) RestoreFromLatestBackup(filePath string) error {
+	// Get all backup files sorted by modification time (oldest first)
+	backupFiles, err := bm.ListBackups(filePath)
+	if err != nil {
+		return err
+	}
+
+	if len(backupFiles) == 0 {
+		return fmt.Errorf("no backup files found for %s", filePath)
+	}
+
+	// Get the latest backup (last in sorted list)
+	latestBackup := backupFiles[len(backupFiles)-1]
+
+	// Restore from the latest backup
+	return bm.RestoreFromBackup(filePath, latestBackup)
+}
+
+// SyncOptions provides options for synchronization
+type SyncOptions struct {
+	DryRun        bool  // 仅验证，不写入
+	CreateBackup  bool  // 更新前创建备份
+	PreserveOther bool  // 保留非 ANTHROPIC 环境变量
 }
 
 // File represents the structure of the config file
@@ -660,6 +814,7 @@ func generateEnvScript(cfg *APIConfig) string {
 }
 
 // syncClaudeSettings syncs configuration to global Claude Code settings file
+// Uses surgical update mechanism to preserve JSON structure and non-ANTHROPIC fields
 func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
@@ -669,53 +824,421 @@ func (cm *Manager) syncClaudeSettings(cfg *APIConfig) error {
 		return nil
 	}
 
-	// Read existing settings
-	data, err := os.ReadFile(claudeSettingsPath)
+	// Read existing settings content (raw to preserve structure and comments)
+	originalContent, err := os.ReadFile(claudeSettingsPath)
 	if err != nil {
 		return fmt.Errorf("Failed to read global Claude Code settings: %v", err)
 	}
 
-	var settings map[string]interface{}
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return fmt.Errorf("Failed to parse global Claude Code settings: %v", err)
+	// Create synchronization options
+	opts := SyncOptions{
+		DryRun:        false,
+		CreateBackup:  true,  // Create backup before update to ensure data safety
+		PreserveOther: true,  // Preserve non-ANTHROPIC environment variables
 	}
 
-	// Ensure env field exists
-	if settings["env"] == nil {
-		settings["env"] = make(map[string]interface{})
-	}
-
-	env := settings["env"].(map[string]interface{})
-
-	// Update environment variables
-	// Clear old ANTHROPIC related variables
-	delete(env, "ANTHROPIC_API_KEY")
-	delete(env, "ANTHROPIC_AUTH_TOKEN")
-	delete(env, "ANTHROPIC_BASE_URL")
-	delete(env, "ANTHROPIC_MODEL")
-
-	// Set new environment variables
-	if cfg.APIKey != "" {
-		env["ANTHROPIC_API_KEY"] = cfg.APIKey
-	}
-	if cfg.AuthToken != "" {
-		env["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
-	}
-	if cfg.BaseURL != "" {
-		env["ANTHROPIC_BASE_URL"] = cfg.BaseURL
-	}
-	if cfg.Model != "" {
-		env["ANTHROPIC_MODEL"] = cfg.Model
-	}
-
-	// Write back to file
-	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	// Perform surgical update using sjson
+	updatedContent, err := updateEnvField(string(originalContent), cfg, opts)
 	if err != nil {
-		return fmt.Errorf("Failed to serialize global Claude Code settings: %v", err)
+		return fmt.Errorf("Failed to update settings content: %v", err)
 	}
 
-	if err := os.WriteFile(claudeSettingsPath, updatedData, 0600); err != nil {
-		return fmt.Errorf("Failed to write global Claude Code settings: %v", err)
+	// Write back to file using atomic update to prevent data corruption
+	if err := atomicFileUpdate(claudeSettingsPath, updatedContent, true); err != nil {
+		// Attempt to restore from backup if update fails
+		restoreErr := restoreFromBackup(claudeSettingsPath)
+		if restoreErr != nil {
+			return fmt.Errorf("Failed to write settings file and restore from backup: update error=%v, restore error=%v", err, restoreErr)
+		}
+		return fmt.Errorf("Failed to write settings file but restored from backup: %v", err)
+	}
+
+	return nil
+}
+
+// showEnvChanges displays the changes between old and new env maps
+func showEnvChanges(oldEnv, newEnv map[string]interface{}) {
+	// Create a map of all variables
+	allVars := make(map[string]bool)
+	for k := range oldEnv {
+		allVars[k] = true
+	}
+	for k := range newEnv {
+		allVars[k] = true
+	}
+
+	// Create sorted list of variables
+	var sortedVars []string
+	for k := range allVars {
+		sortedVars = append(sortedVars, k)
+	}
+	sort.Strings(sortedVars)
+
+	// Print table header
+	fmt.Printf("┌──────────────────────────────┬─────────────────┬─────────────────┐\n")
+	fmt.Printf("│ Variable                     │ Old Value       │ New Value       │\n")
+	fmt.Printf("├──────────────────────────────┼─────────────────┼─────────────────┤\n")
+
+	// Calculate summary counts
+	updatedCount, addedCount, deletedCount, preservedCount := 0, 0, 0, 0
+
+	// Print table rows
+	for _, varName := range sortedVars {
+		oldVal, oldExists := oldEnv[varName]
+		newVal, newExists := newEnv[varName]
+
+		// Determine the type of change
+		var status string
+		if !oldExists {
+			status = "added"
+			addedCount++
+		} else if !newExists {
+			status = "deleted"
+			deletedCount++
+		} else if fmt.Sprintf("%v", oldVal) != fmt.Sprintf("%v", newVal) {
+			status = "updated"
+			updatedCount++
+		} else {
+			status = "preserved"
+			preservedCount++
+		}
+
+		// Format values for display
+		oldValStr := fmt.Sprintf("%v", oldVal)
+		if !oldExists {
+			oldValStr = "(not set)"
+		}
+		newValStr := fmt.Sprintf("%v", newVal)
+		if !newExists {
+			newValStr = "(deleted)"
+		}
+		if status == "preserved" {
+			newValStr = "(unchanged)"
+		}
+
+		// Truncate long strings for table display
+		const maxLen = 20
+		if len(oldValStr) > maxLen {
+			oldValStr = oldValStr[:maxLen-3] + "..."
+		}
+		if len(newValStr) > maxLen {
+			newValStr = newValStr[:maxLen-3] + "..."
+		}
+
+		// Print the table row
+		fmt.Printf("│ %-38s │ %-20s │ %-20s │\n", varName, oldValStr, newValStr)
+	}
+
+	// Print table footer and summary
+	fmt.Printf("└──────────────────────────────┴─────────────────┴─────────────────┘\n\n")
+	fmt.Printf("Summary:\n")
+	fmt.Printf("• %d variable(s) will be updated\n", updatedCount)
+	fmt.Printf("• %d variable(s) will be added\n", addedCount)
+	fmt.Printf("• %d variable(s) will be deleted\n", deletedCount)
+	fmt.Printf("• %d variable(s) will be preserved\n", preservedCount)
+}
+
+// generateDiffReport generates a human-readable report showing differences between old and new content
+func generateDiffReport(originalContent, updatedContent string) (string, error) {
+	// Extract env fields from both
+	originalEnv, err := extractEnv(originalContent)
+	if err != nil {
+		return "", err
+	}
+
+	updatedEnv, err := extractEnv(updatedContent)
+	if err != nil {
+		return "", err
+	}
+
+	// Create a report buffer
+	var report strings.Builder
+
+	// Set up table headers
+	report.WriteString("┌──────────────────────────────┬─────────────────┬─────────────────┐\n")
+	report.WriteString("│ Variable                     │ Old Value       │ New Value       │\n")
+	report.WriteString("├──────────────────────────────┼─────────────────┼─────────────────┤\n")
+
+	// Create a map of all variables
+	allVars := make(map[string]bool)
+	for k := range originalEnv {
+		allVars[k] = true
+	}
+	for k := range updatedEnv {
+		allVars[k] = true
+	}
+
+	// Create sorted list of variables
+	var sortedVars []string
+	for k := range allVars {
+		sortedVars = append(sortedVars, k)
+	}
+	sort.Strings(sortedVars)
+
+	// Calculate summary counts
+	updatedCount, addedCount, deletedCount, preservedCount := 0, 0, 0, 0
+
+	// Generate table rows
+	for _, varName := range sortedVars {
+		oldVal, oldExists := originalEnv[varName]
+		newVal, newExists := updatedEnv[varName]
+
+		// Determine the type of change
+		if !oldExists {
+			addedCount++
+		} else if !newExists {
+			deletedCount++
+		} else if fmt.Sprintf("%v", oldVal) != fmt.Sprintf("%v", newVal) {
+			updatedCount++
+		} else {
+			preservedCount++
+		}
+
+		// Format values for display
+		oldValStr := fmt.Sprintf("%v", oldVal)
+		if !oldExists {
+			oldValStr = "(not set)"
+		}
+		newValStr := fmt.Sprintf("%v", newVal)
+		if !newExists {
+			newValStr = "(deleted)"
+		}
+		if oldExists && newExists && fmt.Sprintf("%v", oldVal) == fmt.Sprintf("%v", newVal) {
+			newValStr = "(unchanged)"
+		}
+
+		// Truncate long strings for table display
+		const maxLen = 20
+		if len(oldValStr) > maxLen {
+			oldValStr = oldValStr[:maxLen-3] + "..."
+		}
+		if len(newValStr) > maxLen {
+			newValStr = newValStr[:maxLen-3] + "..."
+		}
+
+		// Write the table row
+		report.WriteString(fmt.Sprintf("│ %-38s │ %-20s │ %-20s │\n", varName, oldValStr, newValStr))
+	}
+
+	// Close table
+	report.WriteString("└──────────────────────────────┴─────────────────┴─────────────────┘\n\n")
+
+	// Write summary
+	report.WriteString(fmt.Sprintf("Summary:\n"))
+	report.WriteString(fmt.Sprintf("• %d variable(s) will be updated\n", updatedCount))
+	report.WriteString(fmt.Sprintf("• %d variable(s) will be added\n", addedCount))
+	report.WriteString(fmt.Sprintf("• %d variable(s) will be deleted\n", deletedCount))
+	report.WriteString(fmt.Sprintf("• %d variable(s) will be preserved\n", preservedCount))
+
+	return report.String(), nil
+}
+
+// atomicFileUpdate ensures atomic file update to prevent data corruption
+func atomicFileUpdate(filePath string, newContent string, createBackup bool) error {
+	// Create backup if requested
+	if createBackup {
+		bm := NewBackupManager(DefaultBackupRetention)
+		if _, err := bm.CreateBackup(filePath); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
+	}
+
+	// Create temporary file in the same directory
+	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), "settings.json.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name()) // Clean up on failure
+
+	// Write new content to temporary file
+	if _, err := tmpFile.WriteString(newContent); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write to temporary file: %w", err)
+	}
+	tmpFile.Close()
+
+	// Change file permissions to match existing file (0600)
+	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
+		return fmt.Errorf("failed to set permissions on temporary file: %w", err)
+	}
+
+	// Atomic rename - this is guaranteed to be atomic on all POSIX systems
+	if err := os.Rename(tmpFile.Name(), filePath); err != nil {
+		return fmt.Errorf("failed to rename temporary file: %w", err)
+	}
+
+	// Cleanup old backups after successful update
+	if createBackup {
+		bm := NewBackupManager(DefaultBackupRetention)
+		if err := bm.CleanupOldBackups(filePath); err != nil {
+			// Non-fatal error, update was successful
+			fmt.Printf("⚠️  Failed to cleanup old backups: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	// Preserve permissions from source file
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(dst, srcInfo.Mode())
+}
+
+// restoreFromBackup restores a file from its most recent backup (legacy wrapper for backward compatibility)
+func restoreFromBackup(filePath string) error {
+	bm := NewBackupManager(DefaultBackupRetention)
+	return bm.RestoreFromLatestBackup(filePath)
+}
+
+// parseToMaps parses two JSON strings to maps for deep comparison
+func parseToMaps(originalStr, updatedStr string) (map[string]interface{}, map[string]interface{}, error) {
+	var original map[string]interface{}
+	if err := json.Unmarshal([]byte(originalStr), &original); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse original JSON: %w", err)
+	}
+
+	var updated map[string]interface{}
+	if err := json.Unmarshal([]byte(updatedStr), &updated); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse updated JSON: %w", err)
+	}
+
+	return original, updated, nil
+}
+
+// deepCompare compares two maps and returns a list of differing fields
+func deepCompare(original, updated map[string]interface{}) []string {
+	var differences []string
+
+	// Check all keys in original
+	for key, originalVal := range original {
+		if key == "env" {
+			// Skip env field for now, it will be checked separately
+			continue
+		}
+
+		if updatedVal, exists := updated[key]; exists {
+			// Check if values are maps for deep comparison
+			originalMap, originalIsMap := originalVal.(map[string]interface{})
+			updatedMap, updatedIsMap := updatedVal.(map[string]interface{})
+
+			if originalIsMap && updatedIsMap {
+				// Recursively compare nested maps
+				nestedDiffs := deepCompare(originalMap, updatedMap)
+				for _, diff := range nestedDiffs {
+					differences = append(differences, key+"."+diff)
+				}
+			} else {
+				// Compare values directly
+				if fmt.Sprintf("%v", originalVal) != fmt.Sprintf("%v", updatedVal) {
+					differences = append(differences, key)
+				}
+			}
+		} else {
+			// Key missing in updated
+			differences = append(differences, key+" (missing)")
+		}
+	}
+
+	// Check for new keys in updated
+	for key := range updated {
+		if key == "env" {
+			continue // Skip env field, checked separately
+		}
+		if _, exists := original[key]; !exists {
+			differences = append(differences, key+" (new)")
+		}
+	}
+
+	return differences
+}
+
+// extractEnv extracts the env field from JSON content
+func extractEnv(jsonContent string) (map[string]interface{}, error) {
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonContent), &data); err != nil {
+		return nil, err
+	}
+
+	env, exists := data["env"]
+	if !exists {
+		return make(map[string]interface{}), nil // Return empty map if env doesn't exist
+	}
+
+	envMap, ok := env.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("env field is not a map")
+	}
+
+	return envMap, nil
+}
+
+// validateJSONUpdate validates that only the env field has changed in the JSON
+// Requirements: 5.1
+func validateJSONUpdate(originalContent string, updatedContent string) error {
+	// 1. Validate JSON validity
+	if !json.Valid([]byte(originalContent)) {
+		return fmt.Errorf("original JSON is invalid")
+	}
+
+	if !json.Valid([]byte(updatedContent)) {
+		return fmt.Errorf("updated JSON is invalid")
+	}
+
+	// 2. Ensure only env field has changed (excluding ANTHROPIC_ fields)
+	original, updated, err := parseToMaps(originalContent, updatedContent)
+	if err != nil {
+		return err
+	}
+
+	// Compare all fields except env
+	differences := deepCompare(original, updated)
+	if len(differences) > 0 {
+		return fmt.Errorf("unexpected changes to non-env fields: %s", strings.Join(differences, ", "))
+	}
+
+	// 3. Check if non-ANTHROPIC fields were preserved in env
+	originalEnv, err := extractEnv(originalContent)
+	if err != nil {
+		return err
+	}
+
+	updatedEnv, err := extractEnv(updatedContent)
+	if err != nil {
+		return err
+	}
+
+	// Check that all non-ANTHROPIC fields are preserved
+	for key, originalVal := range originalEnv {
+		if !strings.HasPrefix(strings.ToUpper(key), "ANTHROPIC_") {
+			if updatedVal, exists := updatedEnv[key]; exists {
+				if fmt.Sprintf("%v", originalVal) != fmt.Sprintf("%v", updatedVal) {
+					return fmt.Errorf("non-ANTHROPIC field '%s' was modified", key)
+				}
+			} else {
+				return fmt.Errorf("non-ANTHROPIC field '%s' was deleted", key)
+			}
+		}
 	}
 
 	return nil
@@ -738,52 +1261,33 @@ func (cm *Manager) syncProjectClaudeConfig(cfg *APIConfig) error {
 		return nil
 	}
 
-	// Read project-level config
-	data, err := os.ReadFile(projectClaudePath)
+	// Read project-level config content (raw to preserve structure and comments)
+	originalContent, err := os.ReadFile(projectClaudePath)
 	if err != nil {
 		return fmt.Errorf("Failed to read project-level Claude Code settings: %v", err)
 	}
 
-	var settings map[string]interface{}
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return fmt.Errorf("Failed to parse project-level Claude Code settings: %v", err)
+	// Create synchronization options
+	opts := SyncOptions{
+		DryRun:        false,
+		CreateBackup:  true,  // Create backup before update to ensure data safety
+		PreserveOther: true,  // Preserve non-ANTHROPIC environment variables
 	}
 
-	// Update env field
-	if settings["env"] == nil {
-		settings["env"] = make(map[string]interface{})
-	}
-
-	env := settings["env"].(map[string]interface{})
-
-	// Clear old ANTHROPIC related variables
-	delete(env, "ANTHROPIC_API_KEY")
-	delete(env, "ANTHROPIC_AUTH_TOKEN")
-	delete(env, "ANTHROPIC_BASE_URL")
-	delete(env, "ANTHROPIC_MODEL")
-
-	// Set new environment variables
-	if cfg.APIKey != "" {
-		env["ANTHROPIC_API_KEY"] = cfg.APIKey
-	}
-	if cfg.AuthToken != "" {
-		env["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
-	}
-	if cfg.BaseURL != "" {
-		env["ANTHROPIC_BASE_URL"] = cfg.BaseURL
-	}
-	if cfg.Model != "" {
-		env["ANTHROPIC_MODEL"] = cfg.Model
-	}
-
-	// Write back to file
-	updatedData, err := json.MarshalIndent(settings, "", "  ")
+	// Perform surgical update using sjson
+	updatedContent, err := updateEnvField(string(originalContent), cfg, opts)
 	if err != nil {
-		return fmt.Errorf("Failed to serialize project-level Claude Code settings: %v", err)
+		return fmt.Errorf("Failed to update project-level settings content: %v", err)
 	}
 
-	if err := os.WriteFile(projectClaudePath, updatedData, 0600); err != nil {
-		return fmt.Errorf("Failed to write project-level Claude Code settings: %v", err)
+	// Write back to file using atomic update to prevent data corruption
+	if err := atomicFileUpdate(projectClaudePath, updatedContent, true); err != nil {
+		// Attempt to restore from backup if update fails
+		restoreErr := restoreFromBackup(projectClaudePath)
+		if restoreErr != nil {
+			return fmt.Errorf("Failed to write project-level settings file and restore from backup: update error=%v, restore error=%v", err, restoreErr)
+		}
+		return fmt.Errorf("Failed to write project-level settings file but restored from backup: %v", err)
 	}
 
 	fmt.Printf("✅ Project-level Claude Code configuration updated: %s\n", projectClaudePath)
@@ -1132,4 +1636,68 @@ func (cm *Manager) SetModels(alias string, models []string) error {
 	}
 
 	return fmt.Errorf("configuration '%s' does not exist", alias)
+}
+
+// updateEnvField updates the env field in Claude Code configuration JSON
+// It only updates ANTHROPIC_ fields and preserves non-ANTHROPIC fields when PreserveOther is true
+func updateEnvField(originalContent string, cfg *APIConfig, opts SyncOptions) (string, error) {
+	// Parse the JSON content to verify it's valid
+	result := gjson.Parse(originalContent)
+	if !result.Exists() {
+		return "", fmt.Errorf("invalid JSON content")
+	}
+
+	// Extract existing env field if it exists
+	existingEnv := make(map[string]string)
+	if envResult := result.Get("env"); envResult.Exists() {
+		envResult.ForEach(func(key, value gjson.Result) bool {
+			existingEnv[key.Str] = value.Str
+			return true
+		})
+	}
+
+	// Create updated env map
+	updatedEnv := make(map[string]string)
+
+	// Preserve non-ANTHROPIC environment variables if requested
+	if opts.PreserveOther {
+		for key, value := range existingEnv {
+			if !strings.HasPrefix(strings.ToUpper(key), "ANTHROPIC_") {
+				updatedEnv[key] = value
+			}
+		}
+	}
+
+	// Set new ANTHROPIC values (only non-empty values)
+	if cfg.APIKey != "" {
+		updatedEnv["ANTHROPIC_API_KEY"] = cfg.APIKey
+	}
+	if cfg.Model != "" {
+		updatedEnv["ANTHROPIC_MODEL"] = cfg.Model
+	}
+	if cfg.AuthToken != "" {
+		updatedEnv["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
+	}
+	if cfg.BaseURL != "" {
+		updatedEnv["ANTHROPIC_BASE_URL"] = cfg.BaseURL
+	}
+
+	// Convert updatedEnv to JSON string
+	envJSON, err := json.Marshal(updatedEnv)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal updated env: %w", err)
+	}
+
+	// Use sjson.SetRaw to update the env field precisely
+	updatedContent, err := sjson.SetRaw(originalContent, "env", string(envJSON))
+	if err != nil {
+		return "", fmt.Errorf("failed to update env field: %w", err)
+	}
+
+	// Validate the update to ensure only env field has changed and non-ANTHROPIC fields are preserved
+	if err := validateJSONUpdate(originalContent, updatedContent); err != nil {
+		return "", fmt.Errorf("update validation failed: %w", err)
+	}
+
+	return updatedContent, nil
 }
