@@ -33,6 +33,7 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 - **Cross-Platform**: Native support for macOS, Linux, and Windows
 
 ### Advanced Features
+- **Interactive TUI**: Full-featured terminal user interface with keyboard navigation (just run `apimgr` without arguments)
 - **Interactive Editing**: Intuitive interactive commands for adding and modifying configurations
 - **Dual Configuration Modes**:
   - Global: Persistent configuration across all shells
@@ -71,6 +72,33 @@ make install  # Builds and installs locally
 ```
 
 ## Quick Start
+
+### TUI Mode (Recommended)
+
+Simply run `apimgr` without arguments to launch the interactive TUI:
+
+```bash
+apimgr
+```
+
+TUI Keyboard Shortcuts:
+| Key | Action |
+|-----|--------|
+| `j/k` or `↑/↓` | Move up/down |
+| `g/G` | Jump to top/bottom |
+| `Enter` | View details |
+| `s` | Switch config locally (Claude Code) |
+| `S` | Switch config globally |
+| `a` | Add config |
+| `e` | Edit config |
+| `d` | Delete config |
+| `p` | Ping test |
+| `t` | Compatibility test |
+| `m` | Switch model |
+| `?` | Help |
+| `q` | Quit |
+
+### CLI Mode
 
 1. **Add a new configuration**
    ```bash
@@ -153,6 +181,11 @@ apimgr add my-openai --sk sk-... --url https://api.openai.com
 ```
 
 ## Commands
+
+### TUI Mode
+```bash
+apimgr            # Launch interactive TUI interface
+```
 
 ### Basic Commands
 ```bash
