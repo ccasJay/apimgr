@@ -15,6 +15,8 @@ func init() {
 	switchCmd.Flags().BoolP("local", "l", false, "Only take effect in current shell, does not modify global configuration")
 	// Add model switch parameter
 	switchCmd.Flags().StringP("model", "m", "", "Switch to a specific model within the configuration")
+	// Add no-prompt parameter for non-interactive use
+	switchCmd.Flags().Bool("no-prompt", false, "Disable interactive model selection even when multiple models are available")
 }
 
 var switchCmd = &cobra.Command{
@@ -73,6 +75,34 @@ Using -m/--model parameter switches to a specific model within the configuration
 			}
 
 			fmt.Fprintf(os.Stderr, "✓ Switched model to: %s\n", modelFlag)
+		} else {
+			// Check if we need to prompt for model selection
+			noPrompt, _ := cmd.Flags().GetBool("no-prompt")
+			modelSelector := NewModelSelector()
+
+			if modelSelector.ShouldPrompt(apiConfig, modelFlag, noPrompt) {
+				// Prompt user for model selection
+				selectedModel, err := modelSelector.PromptSimple(apiConfig.Models, apiConfig.Model)
+				if err != nil {
+					return fmt.Errorf("model selection failed: %w", err)
+				}
+
+				// If user selected a different model, update it
+				if selectedModel != apiConfig.Model {
+					// Switch the model in the configuration
+					if err := configManager.SwitchModel(alias, selectedModel); err != nil {
+						return err
+					}
+
+					// Refresh the config to get the updated model
+					apiConfig, err = configManager.Get(alias)
+					if err != nil {
+						return err
+					}
+
+					fmt.Fprintf(os.Stderr, "✓ Switched model to: %s\n", selectedModel)
+				}
+			}
 		}
 
 		if local {
