@@ -149,8 +149,7 @@ Using -m/--model parameter switches to a specific model within the configuration
 		// Export new environment variables
 		if apiConfig.APIKey != "" {
 			fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
-		}
-		if apiConfig.AuthToken != "" {
+		} else if apiConfig.AuthToken != "" {
 			fmt.Printf("export ANTHROPIC_AUTH_TOKEN=\"%s\"\n", apiConfig.AuthToken)
 		}
 		if apiConfig.BaseURL != "" {

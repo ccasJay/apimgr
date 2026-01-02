@@ -322,7 +322,7 @@ func (cm *Manager) SetActive(alias string) error {
 		return err
 	}
 
-	return cm.GenerateActiveScript()
+	return cm.generateActiveScript()
 }
 
 // GetActive returns the active configuration
@@ -468,7 +468,7 @@ func (cm *Manager) SwitchModel(alias string, model string) error {
 
 			// If this is the active configuration, update the active.env
 			if configFile.Active == alias {
-				return cm.GenerateActiveScript()
+				return cm.generateActiveScript()
 			}
 
 			return nil
@@ -546,7 +546,7 @@ func (cm *Manager) SetModels(alias string, models []string) error {
 
 			// If this is the active configuration, update the active.env
 			if configFile.Active == alias {
-				return cm.GenerateActiveScript()
+				return cm.generateActiveScript()
 			}
 
 			return nil
@@ -561,6 +561,12 @@ func (cm *Manager) GenerateActiveScript() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	return cm.generateActiveScript()
+}
+
+// generateActiveScript is the internal implementation that generates the activation script.
+// It assumes the caller already holds the lock.
+func (cm *Manager) generateActiveScript() error {
 	configFile, err := cm.loadConfigFile()
 	if err != nil {
 		// No active configuration, clean up active.env file

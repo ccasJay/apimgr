@@ -5,8 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config"
-
+	"apimgr/config/models"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -15,14 +14,14 @@ import (
 func TestInitEditForm(t *testing.T) {
 	tests := []struct {
 		name           string
-		configs        []config.APIConfig
+		configs        []models.APIConfig
 		cursor         int
 		expectViewEdit bool
 		expectFormData FormData
 	}{
 		{
 			name: "edit first config",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{
 					Alias:     "test-config",
 					APIKey:    "sk-test-key",
@@ -45,7 +44,7 @@ func TestInitEditForm(t *testing.T) {
 		},
 		{
 			name: "edit second config",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "config1", APIKey: "key1"},
 				{Alias: "config2", APIKey: "key2", BaseURL: "https://api2.example.com"},
 			},
@@ -59,19 +58,19 @@ func TestInitEditForm(t *testing.T) {
 		},
 		{
 			name:           "cursor out of bounds negative",
-			configs:        []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:        []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			cursor:         -1,
 			expectViewEdit: false,
 		},
 		{
 			name:           "cursor out of bounds positive",
-			configs:        []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:        []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			cursor:         5,
 			expectViewEdit: false,
 		},
 		{
 			name:           "empty configs",
-			configs:        []config.APIConfig{},
+			configs:        []models.APIConfig{},
 			cursor:         0,
 			expectViewEdit: false,
 		},
@@ -135,13 +134,13 @@ func TestInitEditForm(t *testing.T) {
 func TestHandleMainViewKeysEdit(t *testing.T) {
 	tests := []struct {
 		name           string
-		configs        []config.APIConfig
+		configs        []models.APIConfig
 		cursor         int
 		expectViewEdit bool
 	}{
 		{
 			name: "press e with valid cursor",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key"},
 			},
 			cursor:         0,
@@ -149,13 +148,13 @@ func TestHandleMainViewKeysEdit(t *testing.T) {
 		},
 		{
 			name:           "press e with empty configs",
-			configs:        []config.APIConfig{},
+			configs:        []models.APIConfig{},
 			cursor:         0,
 			expectViewEdit: false,
 		},
 		{
 			name: "press e with cursor out of bounds",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key"},
 			},
 			cursor:         5,
@@ -306,13 +305,13 @@ func (e *testError) Error() string {
 func TestHandleDetailViewKeysEdit(t *testing.T) {
 	tests := []struct {
 		name           string
-		configs        []config.APIConfig
+		configs        []models.APIConfig
 		selected       int
 		expectViewEdit bool
 	}{
 		{
 			name: "press e with valid selected",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key"},
 			},
 			selected:       0,
@@ -320,13 +319,13 @@ func TestHandleDetailViewKeysEdit(t *testing.T) {
 		},
 		{
 			name:           "press e with invalid selected negative",
-			configs:        []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:        []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			selected:       -1,
 			expectViewEdit: false,
 		},
 		{
 			name:           "press e with invalid selected out of bounds",
-			configs:        []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:        []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			selected:       5,
 			expectViewEdit: false,
 		},
@@ -367,13 +366,13 @@ func TestHandleDetailViewKeysEdit(t *testing.T) {
 func TestInitModelSelect(t *testing.T) {
 	tests := []struct {
 		name              string
-		cfg               config.APIConfig
+		cfg               models.APIConfig
 		expectModelCursor int
 		expectModelList   []string
 	}{
 		{
 			name: "init with active model in list",
-			cfg: config.APIConfig{
+			cfg: models.APIConfig{
 				Alias:  "test-config",
 				Model:  "model2",
 				Models: []string{"model1", "model2", "model3"},
@@ -383,7 +382,7 @@ func TestInitModelSelect(t *testing.T) {
 		},
 		{
 			name: "init with active model at start",
-			cfg: config.APIConfig{
+			cfg: models.APIConfig{
 				Alias:  "test-config",
 				Model:  "model1",
 				Models: []string{"model1", "model2"},
@@ -393,7 +392,7 @@ func TestInitModelSelect(t *testing.T) {
 		},
 		{
 			name: "init with active model at end",
-			cfg: config.APIConfig{
+			cfg: models.APIConfig{
 				Alias:  "test-config",
 				Model:  "model3",
 				Models: []string{"model1", "model2", "model3"},
@@ -403,7 +402,7 @@ func TestInitModelSelect(t *testing.T) {
 		},
 		{
 			name: "init with active model not in list",
-			cfg: config.APIConfig{
+			cfg: models.APIConfig{
 				Alias:  "test-config",
 				Model:  "unknown-model",
 				Models: []string{"model1", "model2"},
@@ -567,14 +566,14 @@ func TestHandleModelSelectViewKeys(t *testing.T) {
 func TestHandleMainViewKeysModel(t *testing.T) {
 	tests := []struct {
 		name              string
-		configs           []config.APIConfig
+		configs           []models.APIConfig
 		cursor            int
 		expectViewState   ViewState
 		expectErrorMsg    string
 	}{
 		{
 			name: "press m with multiple models",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "key", Models: []string{"model1", "model2"}},
 			},
 			cursor:          0,
@@ -583,25 +582,25 @@ func TestHandleMainViewKeysModel(t *testing.T) {
 		},
 		{
 			name: "press m with single model",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "key", Models: []string{"model1"}},
 			},
 			cursor:          0,
 			expectViewState: ViewMain,
-			expectErrorMsg:  "此配置没有定义多个模型可供切换",
+			expectErrorMsg:  "当前配置只支持单个模型，无法切换。如需添加多个模型，请编辑配置。",
 		},
 		{
 			name: "press m with no models",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "key", Models: []string{}},
 			},
 			cursor:          0,
 			expectViewState: ViewMain,
-			expectErrorMsg:  "此配置没有定义多个模型可供切换",
+			expectErrorMsg:  "当前配置只支持单个模型，无法切换。如需添加多个模型，请编辑配置。",
 		},
 		{
 			name:            "press m with empty configs",
-			configs:         []config.APIConfig{},
+			configs:         []models.APIConfig{},
 			cursor:          0,
 			expectViewState: ViewMain,
 			expectErrorMsg:  "",
@@ -689,7 +688,7 @@ func TestModelSwitchedMsgHandling(t *testing.T) {
 // Requirements: 12.1, 12.2
 func TestRenderModelSelectView(t *testing.T) {
 	m := Model{
-		configs: []config.APIConfig{
+		configs: []models.APIConfig{
 			{Alias: "test-config", Model: "model2", Models: []string{"model1", "model2", "model3"}},
 		},
 		cursor:            0,
@@ -704,8 +703,8 @@ func TestRenderModelSelectView(t *testing.T) {
 	output := m.RenderModelSelectView()
 
 	// Check that the title is present
-	if !strings.Contains(output, "选择模型") {
-		t.Error("RenderModelSelectView() should contain '选择模型'")
+	if !strings.Contains(output, "切换模型") {
+		t.Error("RenderModelSelectView() should contain '切换模型'")
 	}
 
 	// Check that config info is shown
@@ -739,14 +738,14 @@ func TestRenderModelSelectView(t *testing.T) {
 func TestHandleMainViewKeysPing(t *testing.T) {
 	tests := []struct {
 		name            string
-		configs         []config.APIConfig
+		configs         []models.APIConfig
 		cursor          int
 		expectViewState ViewState
 		expectTesting   bool
 	}{
 		{
 			name: "press p with valid cursor",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key", BaseURL: "https://api.example.com"},
 			},
 			cursor:          0,
@@ -755,14 +754,14 @@ func TestHandleMainViewKeysPing(t *testing.T) {
 		},
 		{
 			name:            "press p with empty configs",
-			configs:         []config.APIConfig{},
+			configs:         []models.APIConfig{},
 			cursor:          0,
 			expectViewState: ViewMain,
 			expectTesting:   false,
 		},
 		{
 			name: "press p with cursor out of bounds",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key"},
 			},
 			cursor:          5,
@@ -801,14 +800,14 @@ func TestHandleMainViewKeysPing(t *testing.T) {
 func TestHandleDetailViewKeysPing(t *testing.T) {
 	tests := []struct {
 		name            string
-		configs         []config.APIConfig
+		configs         []models.APIConfig
 		selected        int
 		expectViewState ViewState
 		expectTesting   bool
 	}{
 		{
 			name: "press p with valid selected",
-			configs: []config.APIConfig{
+			configs: []models.APIConfig{
 				{Alias: "test-config", APIKey: "sk-test-key", BaseURL: "https://api.example.com"},
 			},
 			selected:        0,
@@ -817,14 +816,14 @@ func TestHandleDetailViewKeysPing(t *testing.T) {
 		},
 		{
 			name:            "press p with invalid selected negative",
-			configs:         []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:         []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			selected:        -1,
 			expectViewState: ViewDetail,
 			expectTesting:   false,
 		},
 		{
 			name:            "press p with invalid selected out of bounds",
-			configs:         []config.APIConfig{{Alias: "test", APIKey: "key"}},
+			configs:         []models.APIConfig{{Alias: "test", APIKey: "key"}},
 			selected:        5,
 			expectViewState: ViewDetail,
 			expectTesting:   false,
@@ -955,7 +954,7 @@ func TestHandlePingResultViewKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := Model{
 				viewState: ViewPingResult,
-				configs: []config.APIConfig{
+				configs: []models.APIConfig{
 					{Alias: "test-config", APIKey: "key", BaseURL: "https://api.example.com"},
 				},
 				cursor: 0,
@@ -1000,7 +999,7 @@ func TestHandlePingResultViewKeys(t *testing.T) {
 // Requirements: 8.2
 func TestRenderPingTestingView(t *testing.T) {
 	m := Model{
-		configs: []config.APIConfig{
+		configs: []models.APIConfig{
 			{Alias: "test-config", BaseURL: "https://api.example.com"},
 		},
 		cursor:    0,
@@ -1065,7 +1064,7 @@ func TestRenderPingResultView(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := Model{
-				configs: []config.APIConfig{
+				configs: []models.APIConfig{
 					{Alias: "test-config", BaseURL: "https://api.example.com"},
 				},
 				cursor:     0,
@@ -1219,7 +1218,7 @@ func TestGetVisibleListHeight(t *testing.T) {
 func TestAdjustScrollOffset(t *testing.T) {
 	tests := []struct {
 		name               string
-		configs            []config.APIConfig
+		configs            []models.APIConfig
 		cursor             int
 		scrollOffset       int
 		height             int
@@ -1251,7 +1250,7 @@ func TestAdjustScrollOffset(t *testing.T) {
 		},
 		{
 			name:               "empty configs",
-			configs:            []config.APIConfig{},
+			configs:            []models.APIConfig{},
 			cursor:             0,
 			scrollOffset:       0,
 			height:             24,
@@ -1451,10 +1450,10 @@ func TestTruncateText(t *testing.T) {
 }
 
 // makeConfigs creates a slice of test configs
-func makeConfigs(count int) []config.APIConfig {
-	configs := make([]config.APIConfig, count)
+func makeConfigs(count int) []models.APIConfig {
+	configs := make([]models.APIConfig, count)
 	for i := 0; i < count; i++ {
-		configs[i] = config.APIConfig{
+		configs[i] = models.APIConfig{
 			Alias:  fmt.Sprintf("config-%d", i),
 			APIKey: fmt.Sprintf("key-%d", i),
 		}

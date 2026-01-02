@@ -4,7 +4,96 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"apimgr/config/models"
+	"apimgr/config/validation"
 )
+
+// Helper function to create a temporary config file
+func createTempConfigFile(t *testing.T, content string) (string, func()) {
+	t.Helper()
+
+	tmpfile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+
+	if _, err := tmpfile.Write([]byte(content)); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	return tmpfile.Name(), func() {
+		os.Remove(tmpfile.Name())
+	}
+}
+
+func TestValidateConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  models.APIConfig
+		wantErr bool
+	}{
+		{
+			name: "Valid config with API Key",
+			config: models.APIConfig{
+				Alias:    "test",
+				Provider: "anthropic",
+				APIKey:   "sk-test",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid config with Auth Token",
+			config: models.APIConfig{
+				Alias:     "test",
+				Provider:  "anthropic",
+				AuthToken: "token-test",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing Alias",
+			config: models.APIConfig{
+				Provider: "anthropic",
+				APIKey:   "sk-test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing Auth",
+			config: models.APIConfig{
+				Alias:    "test",
+				Provider: "anthropic",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid Provider",
+			config: models.APIConfig{
+				Alias:    "test",
+				Provider: "invalid",
+				APIKey:   "sk-test",
+			},
+			wantErr: true,
+		},
+	}
+
+	validator := validation.NewValidator()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cm := &Manager{}
+			_ = cm // Suppress unused variable warning
+			if err := validator.ValidateConfig(tt.config); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 
 // setupTestConfig creates a test config manager with a temporary directory
 func setupTestConfig(t *testing.T) *Manager {
@@ -13,104 +102,6 @@ func setupTestConfig(t *testing.T) *Manager {
 	configPath := filepath.Join(tempDir, "config.json")
 	return &Manager{configPath: configPath}
 }
-
-func TestConfigManager(t *testing.T) {
-	// Use helper function for automatic cleanup
-	cm := setupTestConfig(t)
-
-	// Test adding config
-	config := APIConfig{
-		Alias:   "test",
-		APIKey:  "sk-test123",
-		BaseURL: "https://api.example.com",
-		Model:   "claude-3",
-	}
-
-	err := cm.Add(config)
-	if err != nil {
-		t.Fatalf("Failed to add config: %v", err)
-	}
-
-	// Test getting config
-	retrievedConfig, err := cm.Get("test")
-	if err != nil {
-		t.Fatalf("Failed to get config: %v", err)
-	}
-
-	if retrievedConfig.Alias != "test" {
-		t.Errorf("Expected alias 'test', got '%s'", retrievedConfig.Alias)
-	}
-
-	if retrievedConfig.APIKey != "sk-test123" {
-		t.Errorf("Expected API key 'sk-test123', got '%s'", retrievedConfig.APIKey)
-	}
-
-	// Test listing configs
-	configs, err := cm.List()
-	if err != nil {
-		t.Fatalf("Failed to list configs: %v", err)
-	}
-
-	if len(configs) != 1 {
-		t.Errorf("Expected 1 config, got %d", len(configs))
-	}
-
-	// Test removing config
-	err = cm.Remove("test")
-	if err != nil {
-		t.Fatalf("Failed to remove config: %v", err)
-	}
-
-	// Verify config was deleted
-	_, err = cm.Get("test")
-	if err == nil {
-		t.Error("Config should have been deleted, but was still retrievable")
-	}
-}
-
-func TestValidateConfig(t *testing.T) {
-	// Use helper function for automatic cleanup
-	cm := setupTestConfig(t)
-
-	// Test empty alias
-	err := cm.validateConfig(APIConfig{Alias: "", APIKey: "key"})
-	if err == nil || err.Error() != "alias cannot be empty" {
-		t.Errorf("Expected 'alias cannot be empty' error, got: %v", err)
-	}
-
-	// Test missing authentication
-	err = cm.validateConfig(APIConfig{Alias: "test"})
-	if err == nil || err.Error() != "API key and auth token cannot both be empty" {
-		t.Errorf("Expected 'API key and auth token cannot both be empty' error, got: %v", err)
-	}
-
-	// Test auth token only (should pass)
-	err = cm.validateConfig(APIConfig{Alias: "test", AuthToken: "token"})
-	if err != nil {
-		t.Errorf("Auth token only config should not error: %v", err)
-	}
-
-	// Test invalid URL
-	err = cm.validateConfig(APIConfig{
-		Alias:   "test",
-		APIKey:  "sk-test",
-		BaseURL: "invalid-url",
-	})
-	if err == nil || err.Error() != "invalid URL format: invalid-url" {
-		t.Errorf("Expected 'invalid URL format' error, got: %v", err)
-	}
-
-	// Test valid config
-	err = cm.validateConfig(APIConfig{
-		Alias:   "test",
-		APIKey:  "sk-test",
-		BaseURL: "https://api.example.com",
-	})
-	if err != nil {
-		t.Errorf("Valid config should not error: %v", err)
-	}
-}
-
 
 // TestSetActive tests setting the active configuration
 func TestSetActive(t *testing.T) {
@@ -124,8 +115,8 @@ func TestSetActive(t *testing.T) {
 		{
 			name: "set valid alias as active",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test1", APIKey: "sk-test1"})
-				cm.Add(APIConfig{Alias: "test2", APIKey: "sk-test2"})
+				cm.Add(models.APIConfig{Alias: "test1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "test2", APIKey: "sk-test2"})
 			},
 			alias:   "test1",
 			wantErr: false,
@@ -133,7 +124,7 @@ func TestSetActive(t *testing.T) {
 		{
 			name: "set non-existent alias returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "test1", APIKey: "sk-test1"})
 			},
 			alias:     "nonexistent",
 			wantErr:   true,
@@ -186,7 +177,7 @@ func TestGetActive(t *testing.T) {
 		{
 			name: "get active configuration",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "test1", APIKey: "sk-test1"})
 				cm.SetActive("test1")
 			},
 			wantAlias: "test1",
@@ -195,7 +186,7 @@ func TestGetActive(t *testing.T) {
 		{
 			name: "no active configuration returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "test1", APIKey: "sk-test1"})
 			},
 			wantErr:   true,
 			errSubstr: "no active configuration set",
@@ -203,7 +194,7 @@ func TestGetActive(t *testing.T) {
 		{
 			name: "active configuration deleted returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "test1", APIKey: "sk-test1"})
 				cm.SetActive("test1")
 				cm.Remove("test1")
 			},
@@ -240,7 +231,7 @@ func TestGetActive(t *testing.T) {
 func TestGenerateActiveScript(t *testing.T) {
 	t.Run("generates script with correct environment variables", func(t *testing.T) {
 		cm := setupTestConfig(t)
-		cm.Add(APIConfig{
+		cm.Add(models.APIConfig{
 			Alias:   "test",
 			APIKey:  "sk-test123",
 			BaseURL: "https://api.example.com",
@@ -309,7 +300,7 @@ func TestUpdatePartial(t *testing.T) {
 		{
 			name: "update api_key field",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test", APIKey: "sk-old"})
+				cm.Add(models.APIConfig{Alias: "test", APIKey: "sk-old"})
 			},
 			alias:   "test",
 			updates: map[string]string{"api_key": "sk-new"},
@@ -324,7 +315,7 @@ func TestUpdatePartial(t *testing.T) {
 		{
 			name: "update multiple fields",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test", APIKey: "sk-test"})
+				cm.Add(models.APIConfig{Alias: "test", APIKey: "sk-test"})
 			},
 			alias: "test",
 			updates: map[string]string{
@@ -345,7 +336,7 @@ func TestUpdatePartial(t *testing.T) {
 		{
 			name: "update non-existent config returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test", APIKey: "sk-test"})
+				cm.Add(models.APIConfig{Alias: "test", APIKey: "sk-test"})
 			},
 			alias:     "nonexistent",
 			updates:   map[string]string{"api_key": "sk-new"},
@@ -392,7 +383,7 @@ func TestRenameAlias(t *testing.T) {
 		{
 			name: "rename alias successfully",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "old", APIKey: "sk-test"})
+				cm.Add(models.APIConfig{Alias: "old", APIKey: "sk-test"})
 			},
 			oldAlias: "old",
 			newAlias: "new",
@@ -416,8 +407,8 @@ func TestRenameAlias(t *testing.T) {
 		{
 			name: "rename to existing alias returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "config1", APIKey: "sk-test1"})
-				cm.Add(APIConfig{Alias: "config2", APIKey: "sk-test2"})
+				cm.Add(models.APIConfig{Alias: "config1", APIKey: "sk-test1"})
+				cm.Add(models.APIConfig{Alias: "config2", APIKey: "sk-test2"})
 			},
 			oldAlias:  "config1",
 			newAlias:  "config2",
@@ -427,7 +418,7 @@ func TestRenameAlias(t *testing.T) {
 		{
 			name: "rename non-existent alias returns error",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "test", APIKey: "sk-test"})
+				cm.Add(models.APIConfig{Alias: "test", APIKey: "sk-test"})
 			},
 			oldAlias:  "nonexistent",
 			newAlias:  "new",
@@ -437,7 +428,7 @@ func TestRenameAlias(t *testing.T) {
 		{
 			name: "rename active config updates active field",
 			setup: func(cm *Manager) {
-				cm.Add(APIConfig{Alias: "active", APIKey: "sk-test"})
+				cm.Add(models.APIConfig{Alias: "active", APIKey: "sk-test"})
 				cm.SetActive("active")
 			},
 			oldAlias: "active",

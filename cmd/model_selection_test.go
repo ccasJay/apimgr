@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config"
+	"apimgr/config/models"
 )
 
 func TestShouldPrompt_单模型配置不提示(t *testing.T) {
 	// Arrange
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Model:  "model-1",
 		Models: []string{"model-1"},
 	}
@@ -27,7 +27,7 @@ func TestShouldPrompt_单模型配置不提示(t *testing.T) {
 
 func TestShouldPrompt_多模型配置提示(t *testing.T) {
 	// Arrange
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Model:  "model-1",
 		Models: []string{"model-1", "model-2", "model-3"},
 	}
@@ -45,7 +45,7 @@ func TestShouldPrompt_多模型配置提示(t *testing.T) {
 
 func TestShouldPrompt_指定模型参数不提示(t *testing.T) {
 	// Arrange
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Model:  "model-1",
 		Models: []string{"model-1", "model-2"},
 	}
@@ -62,7 +62,7 @@ func TestShouldPrompt_指定模型参数不提示(t *testing.T) {
 
 func TestShouldPrompt_显式禁用不提示(t *testing.T) {
 	// Arrange
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Model:  "model-1",
 		Models: []string{"model-1", "model-2"},
 	}

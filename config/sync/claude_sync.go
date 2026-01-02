@@ -50,12 +50,11 @@ func UpdateEnvField(originalContent string, cfg *models.APIConfig, opts SyncOpti
 	// Set new ANTHROPIC values (only non-empty values)
 	if cfg.APIKey != "" {
 		updatedEnv["ANTHROPIC_API_KEY"] = cfg.APIKey
+	} else if cfg.AuthToken != "" {
+		updatedEnv["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
 	}
 	if cfg.Model != "" {
 		updatedEnv["ANTHROPIC_MODEL"] = cfg.Model
-	}
-	if cfg.AuthToken != "" {
-		updatedEnv["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
 	}
 	if cfg.BaseURL != "" {
 		updatedEnv["ANTHROPIC_BASE_URL"] = cfg.BaseURL

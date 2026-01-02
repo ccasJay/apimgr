@@ -3,7 +3,7 @@ package compatibility
 import (
 	"testing"
 
-	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/providers"
 
 	"github.com/leanovate/gopter"
@@ -38,7 +38,7 @@ func TestProperty3_DefaultModelFallback(t *testing.T) {
 	// Property: When model is empty, tester uses provider's default model
 	properties.Property("empty model config uses provider default model", prop.ForAll(
 		func(providerName string, apiKey string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 				Model:    "", // Empty model
@@ -67,7 +67,7 @@ func TestProperty3_DefaultModelFallback(t *testing.T) {
 	// Property: When model is specified, tester uses the specified model
 	properties.Property("specified model config uses specified model", prop.ForAll(
 		func(providerName string, apiKey string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 				Model:    model, // Specified model
@@ -91,7 +91,7 @@ func TestProperty3_DefaultModelFallback(t *testing.T) {
 	// Property: Default model is never empty
 	properties.Property("default model is never empty", prop.ForAll(
 		func(providerName string, apiKey string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 				Model:    "", // Empty model
@@ -113,7 +113,7 @@ func TestProperty3_DefaultModelFallback(t *testing.T) {
 	// Property: Provider resolution works correctly
 	properties.Property("provider is correctly resolved from config", prop.ForAll(
 		func(providerName string, apiKey string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 			}
@@ -134,7 +134,7 @@ func TestProperty3_DefaultModelFallback(t *testing.T) {
 	// Property: Empty provider defaults to anthropic
 	properties.Property("empty provider defaults to anthropic", prop.ForAll(
 		func(apiKey string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "", // Empty provider
 				APIKey:   apiKey,
 			}
@@ -164,7 +164,7 @@ func TestNewTester_NilConfig(t *testing.T) {
 
 // TestNewTester_InvalidProvider tests that NewTester returns an error for invalid provider
 func TestNewTester_InvalidProvider(t *testing.T) {
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Provider: "invalid-provider",
 		APIKey:   "test-key",
 	}
@@ -177,7 +177,7 @@ func TestNewTester_InvalidProvider(t *testing.T) {
 
 // TestTesterOptions tests the functional options for Tester
 func TestTesterOptions(t *testing.T) {
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Provider: "anthropic",
 		APIKey:   "test-key",
 	}
@@ -260,7 +260,7 @@ func TestNewTester_AutoDetectProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "", // Empty provider to trigger auto-detection
 				APIKey:   "test-key",
 				BaseURL:  tt.baseURL,
@@ -281,7 +281,7 @@ func TestNewTester_AutoDetectProvider(t *testing.T) {
 // TestNewTester_ExplicitProviderOverridesAutoDetect tests that explicit provider takes precedence
 func TestNewTester_ExplicitProviderOverridesAutoDetect(t *testing.T) {
 	// Even with an OpenAI URL, explicit anthropic provider should be used
-	cfg := &config.APIConfig{
+	cfg := &models.APIConfig{
 		Provider: "anthropic",
 		APIKey:   "test-key",
 		BaseURL:  "https://api.openai.com", // OpenAI URL
@@ -301,7 +301,7 @@ func TestNewTester_ExplicitProviderOverridesAutoDetect(t *testing.T) {
 // TestWasProviderAutoDetected tests the WasProviderAutoDetected method
 func TestWasProviderAutoDetected(t *testing.T) {
 	// Test with explicit provider
-	cfg1 := &config.APIConfig{
+	cfg1 := &models.APIConfig{
 		Provider: "anthropic",
 		APIKey:   "test-key",
 	}
@@ -311,7 +311,7 @@ func TestWasProviderAutoDetected(t *testing.T) {
 	}
 
 	// Test with auto-detected provider
-	cfg2 := &config.APIConfig{
+	cfg2 := &models.APIConfig{
 		Provider: "", // Empty to trigger auto-detection
 		APIKey:   "test-key",
 		BaseURL:  "https://api.openai.com",

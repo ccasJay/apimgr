@@ -28,8 +28,7 @@ func GenerateEnvScript(cfg *models.APIConfig) string {
 	buf.WriteString("# Set new environment variables\n")
 	if cfg.APIKey != "" {
 		buf.WriteString(fmt.Sprintf("export ANTHROPIC_API_KEY=%q\n", cfg.APIKey))
-	}
-	if cfg.AuthToken != "" {
+	} else if cfg.AuthToken != "" {
 		buf.WriteString(fmt.Sprintf("export ANTHROPIC_AUTH_TOKEN=%q\n", cfg.AuthToken))
 	}
 	if cfg.BaseURL != "" {
