@@ -8,6 +8,7 @@ import (
 	"apimgr/config"
 	"apimgr/config/session"
 	"apimgr/config/validation"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +47,8 @@ Using -m/--model parameter switches to a specific model within the configuration
 		// Read the model flag
 		modelFlag, _ := cmd.Flags().GetString("model")
 
+		successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+
 		configManager, err := config.NewConfigManager()
 		if err != nil {
 			return fmt.Errorf("failed to initialize config manager: %w", err)
@@ -76,7 +79,7 @@ Using -m/--model parameter switches to a specific model within the configuration
 				return err
 			}
 
-			fmt.Fprintf(os.Stderr, "✓ Switched model to: %s\n", modelFlag)
+			fmt.Fprintln(os.Stderr, successStyle.Render(fmt.Sprintf("✓ Switched model to: %s", modelFlag)))
 		} else {
 			// Check if we need to prompt for model selection
 			noPrompt, _ := cmd.Flags().GetBool("no-prompt")
@@ -102,7 +105,7 @@ Using -m/--model parameter switches to a specific model within the configuration
 						return err
 					}
 
-					fmt.Fprintf(os.Stderr, "✓ Switched model to: %s\n", selectedModel)
+					fmt.Fprintln(os.Stderr, successStyle.Render(fmt.Sprintf("✓ Switched model to: %s", selectedModel)))
 				}
 			}
 		}
@@ -161,10 +164,10 @@ Using -m/--model parameter switches to a specific model within the configuration
 		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
 
 		if local {
-			fmt.Fprintf(os.Stderr, "✓ Switched to configuration locally: %s\n", alias)
+			fmt.Fprintln(os.Stderr, successStyle.Render(fmt.Sprintf("✓ Switched to configuration locally: %s", alias)))
 		} else {
 			if modelFlag == "" {
-				fmt.Fprintf(os.Stderr, "✓ Switched to configuration: %s\n", alias)
+				fmt.Fprintln(os.Stderr, successStyle.Render(fmt.Sprintf("✓ Switched to configuration: %s", alias)))
 			}
 		}
 		return nil

@@ -98,9 +98,51 @@ func TestValidateConfig(t *testing.T) {
 // setupTestConfig creates a test config manager with a temporary directory
 func setupTestConfig(t *testing.T) *Manager {
 	t.Helper()
+	t.Setenv("APIMGR_ACTIVE", "") // Ensure clean environment
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.json")
 	return &Manager{configPath: configPath}
+}
+
+// TestGetActiveEnvOverride tests that APIMGR_ACTIVE environment variable overrides the active configuration
+func TestGetActiveEnvOverride(t *testing.T) {
+	cm := setupTestConfig(t)
+	// Add two configs
+	cm.Add(models.APIConfig{Alias: "global", APIKey: "sk-global"})
+	cm.Add(models.APIConfig{Alias: "local", APIKey: "sk-local"})
+
+	// Set global active to "global"
+	cm.SetActive("global")
+
+	// Verify global is active initially
+	active, err := cm.GetActiveName()
+	if err != nil {
+		t.Fatalf("GetActiveName() unexpected error: %v", err)
+	}
+	if active != "global" {
+		t.Errorf("Initial GetActiveName() = %q, want %q", active, "global")
+	}
+
+	// Set environment variable override
+	t.Setenv("APIMGR_ACTIVE", "local")
+
+	// Verify local is now active via GetActiveName
+	active, err = cm.GetActiveName()
+	if err != nil {
+		t.Fatalf("GetActiveName() unexpected error: %v", err)
+	}
+	if active != "local" {
+		t.Errorf("Overridden GetActiveName() = %q, want %q", active, "local")
+	}
+
+	// Verify local is now active via GetActive
+	cfg, err := cm.GetActive()
+	if err != nil {
+		t.Fatalf("GetActive() unexpected error: %v", err)
+	}
+	if cfg.Alias != "local" {
+		t.Errorf("Overridden GetActive().Alias = %q, want %q", cfg.Alias, "local")
+	}
 }
 
 // TestSetActive tests setting the active configuration
@@ -218,6 +260,7 @@ func TestGetActive(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Errorf("GetActive() unexpected error: %v", err)
+					return
 				}
 				if cfg.Alias != tt.wantAlias {
 					t.Errorf("GetActive().Alias = %q, want %q", cfg.Alias, tt.wantAlias)

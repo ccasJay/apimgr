@@ -28,7 +28,12 @@ func (v *Validator) ValidateConfig(config models.APIConfig) error {
 		providerName = "anthropic"
 	}
 
-	// 至少需要一种认证方式
+	// APIKey and AuthToken are mutually exclusive
+	if config.APIKey != "" && config.AuthToken != "" {
+		return fmt.Errorf("API key and auth token cannot be used at the same time")
+	}
+
+	// At least one authentication method is required
 	if config.APIKey == "" && config.AuthToken == "" {
 		return fmt.Errorf("API key and auth token cannot both be empty")
 	}
