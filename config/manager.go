@@ -92,7 +92,7 @@ func (cm *Manager) loadConfigFile() (*models.File, error) {
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
-			fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
+			// fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
 		}
 	}()
 
@@ -149,7 +149,7 @@ func (cm *Manager) saveConfigFile(configFile *models.File) error {
 	}
 	defer func() {
 		if err := cm.unlockFile(file); err != nil {
-			fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
+			// fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
 		}
 	}()
 
@@ -335,21 +335,32 @@ func (cm *Manager) GetActive() (*models.APIConfig, error) {
 		return nil, err
 	}
 
-	if configFile.Active == "" {
+	activeAlias := configFile.Active
+	// Check environment variable override
+	if envActive := os.Getenv("APIMGR_ACTIVE"); envActive != "" {
+		activeAlias = envActive
+	}
+
+	if activeAlias == "" {
 		return nil, fmt.Errorf("no active configuration set")
 	}
 
 	for _, config := range configFile.Configs {
-		if config.Alias == configFile.Active {
+		if config.Alias == activeAlias {
 			return &config, nil
 		}
 	}
 
-	return nil, fmt.Errorf("active configuration '%s' does not exist", configFile.Active)
+	return nil, fmt.Errorf("active configuration '%s' does not exist", activeAlias)
 }
 
 // GetActiveName returns the active configuration name
 func (cm *Manager) GetActiveName() (string, error) {
+	// Check environment variable override first
+	if envActive := os.Getenv("APIMGR_ACTIVE"); envActive != "" {
+		return envActive, nil
+	}
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -375,9 +386,15 @@ func (cm *Manager) UpdatePartial(alias string, updates map[string]string) error 
 			// Update only the fields that are provided
 			if apiKey, ok := updates["api_key"]; ok {
 				configFile.Configs[i].APIKey = apiKey
+				if apiKey != "" {
+					configFile.Configs[i].AuthToken = "" // Clear auth token
+				}
 			}
 			if authToken, ok := updates["auth_token"]; ok {
 				configFile.Configs[i].AuthToken = authToken
+				if authToken != "" {
+					configFile.Configs[i].APIKey = "" // Clear API key
+				}
 			}
 			if baseURL, ok := updates["base_url"]; ok {
 				configFile.Configs[i].BaseURL = baseURL
@@ -605,7 +622,8 @@ func (cm *Manager) generateActiveScript() error {
 
 	// Sync to global Claude Code settings (optional feature, doesn't affect main flow)
 	if syncErr := cm.SyncClaudeSettingsOnly(active); syncErr != nil {
-		fmt.Printf("⚠️  Failed to sync to global Claude Code settings: %v\n", syncErr)
+		// Silently ignore error in TUI mode or log to file if logger is available
+		// fmt.Printf("⚠️  Failed to sync to global Claude Code settings: %v\n", syncErr)
 	}
 
 	return nil

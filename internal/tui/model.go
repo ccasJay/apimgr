@@ -75,8 +75,8 @@ type Model struct {
 	compatResult *CompatTestResult // Compatibility test result
 
 	// Model selection state
-	modelCursor int      // Cursor position in model selection list
-	modelList   []string // Available models for current config
+	modelCursor int        // Cursor position in model selection list
+	modelList   []string   // Available models for current config
 	switchType  SwitchType // Current switch type (local or global)
 
 	// Help view scroll state
@@ -145,7 +145,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ConfigsLoadedMsg:
 		m.configs = msg.Configs
-		m.activeAlias = msg.ActiveAlias
+
+		// Check if current active alias still exists in the new config list
+		activeExists := false
+		if m.activeAlias != "" {
+			for _, cfg := range m.configs {
+				if cfg.Alias == m.activeAlias {
+					activeExists = true
+					break
+				}
+			}
+		}
+
+		// If current active alias doesn't exist (or is empty), use the one from message (global active)
+		if !activeExists {
+			m.activeAlias = msg.ActiveAlias
+		}
+
 		// Adjust cursor if it's out of bounds after reload (e.g., after deletion)
 		if len(m.configs) > 0 && m.cursor >= len(m.configs) {
 			m.cursor = len(m.configs) - 1
@@ -160,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			m.errorMsg = msg.Err.Error()
 		} else {
-			// Update active alias for both local and global switches to ensure correct highlighting
+// Always update active alias to reflect the switch (local or global)
 			m.activeAlias = msg.Alias
 			if msg.IsLocal {
 				m.message = "已本地切换到: " + msg.Alias + " (仅当前终端会话)"
@@ -216,6 +232,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errorMsg = msg.Err.Error()
 		} else {
 			m.message = "模型已切换到: " + msg.Model
+
+			// If activation was requested (local or global switch), update active alias
+			if msg.Activate {
+				m.activeAlias = msg.Alias
+				if msg.IsLocal {
+					m.message += " (本地生效)"
+				} else {
+					m.message += " (全局生效)"
+				}
+			}
+
 			m.viewState = ViewMain
 			// Reload configs to reflect the change
 			return m, loadConfigs(m.configManager)
@@ -671,7 +698,7 @@ func (m *Model) getVisibleListHeight() int {
 	// - Status bar (at least 2 lines for shortcuts + potential messages)
 	headerLines := 3
 	footerLines := 4
-	
+
 	available := m.height - headerLines - footerLines
 	if available < 1 {
 		available = 1
@@ -683,22 +710,22 @@ func (m *Model) getVisibleListHeight() int {
 // Requirements: 11.3
 func (m *Model) adjustScrollOffset() {
 	visibleHeight := m.getVisibleListHeight()
-	
+
 	// If cursor is above visible area, scroll up
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
 	}
-	
+
 	// If cursor is below visible area, scroll down
 	if m.cursor >= m.scrollOffset+visibleHeight {
 		m.scrollOffset = m.cursor - visibleHeight + 1
 	}
-	
+
 	// Ensure scroll offset is not negative
 	if m.scrollOffset < 0 {
 		m.scrollOffset = 0
 	}
-	
+
 	// Ensure we don't scroll past the end
 	maxOffset := len(m.configs) - visibleHeight
 	if maxOffset < 0 {
@@ -1082,7 +1109,7 @@ func (m *Model) initModelSelect(cfg models.APIConfig) {
 	m.viewState = ViewModelSelect
 	m.message = ""
 	m.errorMsg = ""
-	m.modelScrollOffset = 0 // Reset scroll offset when initializing
+	m.modelScrollOffset = 0       // Reset scroll offset when initializing
 	m.switchType = SwitchTypeNone // Will be set by the caller
 }
 
@@ -1199,7 +1226,7 @@ func (m *Model) getVisibleModelListHeight() int {
 	// - Help text (1)
 	headerLines := 6
 	footerLines := 3
-	
+
 	available := m.height - headerLines - footerLines
 	if available < 1 {
 		available = 1
@@ -1211,22 +1238,22 @@ func (m *Model) getVisibleModelListHeight() int {
 // Requirements: 11.3
 func (m *Model) adjustModelScrollOffset() {
 	visibleHeight := m.getVisibleModelListHeight()
-	
+
 	// If cursor is above visible area, scroll up
 	if m.modelCursor < m.modelScrollOffset {
 		m.modelScrollOffset = m.modelCursor
 	}
-	
+
 	// If cursor is below visible area, scroll down
 	if m.modelCursor >= m.modelScrollOffset+visibleHeight {
 		m.modelScrollOffset = m.modelCursor - visibleHeight + 1
 	}
-	
+
 	// Ensure scroll offset is not negative
 	if m.modelScrollOffset < 0 {
 		m.modelScrollOffset = 0
 	}
-	
+
 	// Ensure we don't scroll past the end
 	maxOffset := len(m.modelList) - visibleHeight
 	if maxOffset < 0 {
@@ -1264,9 +1291,11 @@ func switchModel(cm *config.Manager, alias string, model string) tea.Cmd {
 		}
 
 		return ModelSwitchedMsg{
-			Alias: alias,
-			Model: model,
-			Err:   nil,
+			Alias:    alias,
+			Model:    model,
+			IsLocal:  false,
+			Activate: false,
+			Err:      nil,
 		}
 	}
 }
@@ -1306,9 +1335,11 @@ func switchModelAndSync(cm *config.Manager, alias string, model string, isLocal 
 			}
 
 			return ModelSwitchedMsg{
-				Alias: alias,
-				Model: model,
-				Err:   nil,
+				Alias:    alias,
+				Model:    model,
+				IsLocal:  true,
+				Activate: true,
+				Err:      nil,
 			}
 		} else {
 			// For global switch, set as active and sync
@@ -1326,9 +1357,11 @@ func switchModelAndSync(cm *config.Manager, alias string, model string, isLocal 
 			}
 
 			return ModelSwitchedMsg{
-				Alias: alias,
-				Model: model,
-				Err:   nil,
+				Alias:    alias,
+				Model:    model,
+				IsLocal:  false,
+				Activate: true,
+				Err:      nil,
 			}
 		}
 	}

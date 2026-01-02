@@ -16,6 +16,7 @@ import (
 // setupTestSession creates a test config manager with a temporary directory
 func setupTestSession(t *testing.T) (*Manager, string) {
 	t.Helper()
+	t.Setenv("APIMGR_ACTIVE", "") // Ensure clean environment
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.json")
 	cm := &Manager{configPath: configPath}
@@ -385,6 +386,7 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 // Claude Code settings to match the global active configuration
 func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 	// Use t.TempDir() for automatic cleanup
+	t.Setenv("APIMGR_ACTIVE", "")
 	tempDir := t.TempDir()
 
 	// Setup Claude environment
@@ -518,6 +520,7 @@ func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 // Test RestoreClaudeToGlobal clears settings when no global active exists
 func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 	// Use t.TempDir() for automatic cleanup
+	t.Setenv("APIMGR_ACTIVE", "")
 	tempDir := t.TempDir()
 
 	// Setup Claude environment

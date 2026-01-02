@@ -53,7 +53,9 @@ type CompatResultMsg struct {
 
 // ModelSwitchedMsg is sent when model is switched
 type ModelSwitchedMsg struct {
-	Alias string
-	Model string
-	Err   error
+	Alias    string
+	Model    string
+	IsLocal  bool
+	Activate bool
+	Err      error
 }
