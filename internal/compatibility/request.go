@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/providers"
 )
 
@@ -159,7 +159,7 @@ func (b *OpenAIRequestBuilder) BuildChatRequest(model string, streaming bool) (*
 }
 
 // NewRequestBuilder creates a new RequestBuilder based on the provider type
-func NewRequestBuilder(cfg *config.APIConfig, provider providers.Provider) RequestBuilder {
+func NewRequestBuilder(cfg *models.APIConfig, provider providers.Provider) RequestBuilder {
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
 		baseURL = provider.DefaultBaseURL()
@@ -187,7 +187,7 @@ func NewRequestBuilder(cfg *config.APIConfig, provider providers.Provider) Reque
 }
 
 // NewRequestBuilderWithCustomPath creates a RequestBuilder with a custom endpoint path
-func NewRequestBuilderWithCustomPath(cfg *config.APIConfig, provider providers.Provider, customPath string) RequestBuilder {
+func NewRequestBuilderWithCustomPath(cfg *models.APIConfig, provider providers.Provider, customPath string) RequestBuilder {
 	builder := NewRequestBuilder(cfg, provider)
 
 	// Wrap the builder to use custom path

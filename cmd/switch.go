@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"apimgr/config"
+	"apimgr/config/session"
+	"apimgr/config/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +60,7 @@ Using -m/--model parameter switches to a specific model within the configuration
 		// Handle model switch if --model flag is provided
 		if modelFlag != "" {
 			// Validate model is in supported list
-			validator := config.NewModelValidator()
+			validator := validation.NewModelValidator()
 			if err := validator.ValidateModelInList(modelFlag, apiConfig.Models); err != nil {
 				return err
 			}
@@ -110,7 +112,7 @@ Using -m/--model parameter switches to a specific model within the configuration
 			pid := fmt.Sprintf("%d", os.Getpid())
 
 			// Create session marker
-			if err := configManager.CreateSessionMarker(pid, alias); err != nil {
+			if err := session.CreateSessionMarker(configManager.GetConfigPath(), pid, alias); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to create session marker: %v\n", err)
 			}
 

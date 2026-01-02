@@ -7,7 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"apimgr/config"
+	"apimgr/config/models"
+	"apimgr/config/validation"
 )
 
 // ModelSelector handles interactive model selection functionality
@@ -24,7 +25,7 @@ func NewModelSelector() *ModelSelector {
 // 2. modelFlag is empty (user didn't specify a model)
 // 3. config.Models has more than one model
 // 4. Stdin is an interactive terminal
-func (ms *ModelSelector) ShouldPrompt(cfg *config.APIConfig, modelFlag string, noPrompt bool) bool {
+func (ms *ModelSelector) ShouldPrompt(cfg *models.APIConfig, modelFlag string, noPrompt bool) bool {
 	if noPrompt {
 		return false
 	}
@@ -92,7 +93,7 @@ func (ms *ModelSelector) PromptSimple(models []string, currentModel string) (str
 
 // ValidateModelInList checks if the specified model exists in the provided list of models
 func (ms *ModelSelector) ValidateModelInList(model string, models []string) error {
-	validator := config.NewModelValidator()
+	validator := validation.NewModelValidator()
 	return validator.ValidateModelInList(model, models)
 }
 

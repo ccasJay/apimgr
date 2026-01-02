@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/compatibility"
 	"apimgr/internal/providers"
 	"apimgr/internal/utils"
@@ -67,7 +68,7 @@ func runPingCommand(cmd *cobra.Command, args []string) error {
 
 // runCompatibilityTest runs the full API compatibility test using the compatibility package
 func runCompatibilityTest(cmd *cobra.Command, args []string, configManager *config.Manager) error {
-	var cfg *config.APIConfig
+	var cfg *models.APIConfig
 	var err error
 	var alias string
 
@@ -225,7 +226,7 @@ func runBasicConnectivityTest(cmd *cobra.Command, args []string, configManager *
 	}
 
 	// Add auth headers for configured API (not for custom URL mode)
-	var cfg *config.APIConfig
+	var cfg *models.APIConfig
 	var apiErr error
 
 	if !isCustomURL {

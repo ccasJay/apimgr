@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"apimgr/config"
+	"apimgr/config/session"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ Users typically do not need to call this command directly.`,
 			os.Exit(0)
 		}
 
-		if err := configManager.CleanupSession(pid); err != nil {
+		if err := session.CleanupSession(configManager.GetConfigPath(), pid); err != nil {
 			// Log error but don't fail - this is called during shell exit
 			// and we don't want to prevent the shell from exiting
 			fmt.Fprintf(os.Stderr, "Warning: Failed to cleanup session: %v\n", err)

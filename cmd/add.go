@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"apimgr/config"
+	"apimgr/config/models"
 	"github.com/spf13/cobra"
 )
 
@@ -33,13 +34,13 @@ func parseModelsList(modelsStr string) []string {
 
 // APIConfigBuilder is responsible for building and validating APIConfig
 type APIConfigBuilder struct {
-	config *config.APIConfig
+	config *models.APIConfig
 }
 
 // NewAPIConfigBuilder creates a new builder
 func NewAPIConfigBuilder() *APIConfigBuilder {
 	return &APIConfigBuilder{
-		config: &config.APIConfig{},
+		config: &models.APIConfig{},
 	}
 }
 
@@ -80,7 +81,7 @@ func (b *APIConfigBuilder) SetModels(models []string) *APIConfigBuilder {
 }
 
 // Build builds the config
-func (b *APIConfigBuilder) Build() (*config.APIConfig, error) {
+func (b *APIConfigBuilder) Build() (*models.APIConfig, error) {
 	if err := b.validate(); err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func isTerminal() bool {
 }
 
 // CollectInteractively collects input interactively
-func (ic *InputCollector) CollectInteractively(presetType string) (*config.APIConfig, error) {
+func (ic *InputCollector) CollectInteractively(presetType string) (*models.APIConfig, error) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("Enter config alias: ")
@@ -203,7 +204,7 @@ var addCmd = &cobra.Command{
 		collector := &InputCollector{}
 
 		// Determine input mode
-		var cfg *config.APIConfig
+		var cfg *models.APIConfig
 
 		hasSK := cmd.Flags().Lookup("sk").Changed
 		hasAK := cmd.Flags().Lookup("ak").Changed
