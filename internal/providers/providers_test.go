@@ -35,7 +35,7 @@ func TestAnthropicProvider(t *testing.T) {
 		}{
 			{"valid with apiKey", "test-api-123", "", false},
 			{"valid with authToken", "", "auth-token-123", false},
-			{"valid with both", "test-api-123", "auth-token-123", false},
+			{"invalid with both", "test-api-123", "auth-token-123", true},
 			{"invalid without both", "", "", true},
 		}
 

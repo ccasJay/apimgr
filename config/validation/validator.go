@@ -28,9 +28,12 @@ func (v *Validator) ValidateConfig(config models.APIConfig) error {
 		providerName = "anthropic"
 	}
 
-	// 至少需要一种认证方式
+	// 至少需要一种认证方式，且只能有一种
 	if config.APIKey == "" && config.AuthToken == "" {
 		return fmt.Errorf("API key and auth token cannot both be empty")
+	}
+	if config.APIKey != "" && config.AuthToken != "" {
+		return fmt.Errorf("API key and auth token cannot both be set")
 	}
 
 	// Validate provider

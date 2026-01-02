@@ -68,6 +68,9 @@ func (p *AnthropicProvider) ValidateConfig(baseURL, apiKey, authToken string) er
 	if apiKey == "" && authToken == "" {
 		return fmt.Errorf("anthropic: must provide either API key or auth token")
 	}
+	if apiKey != "" && authToken != "" {
+		return fmt.Errorf("anthropic: cannot provide both API key and auth token")
+	}
 	return nil
 }
 

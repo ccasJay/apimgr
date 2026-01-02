@@ -160,10 +160,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			m.errorMsg = msg.Err.Error()
 		} else {
+			// Update active alias for both local and global switches to ensure correct highlighting
+			m.activeAlias = msg.Alias
 			if msg.IsLocal {
 				m.message = "已本地切换到: " + msg.Alias + " (仅当前终端会话)"
 			} else {
-				m.activeAlias = msg.Alias
 				m.message = "已全局切换到: " + msg.Alias
 			}
 		}
