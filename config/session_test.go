@@ -8,6 +8,9 @@ import (
 	"testing"
 	"testing/quick"
 	"time"
+
+	"apimgr/config/models"
+	"apimgr/config/session"
 )
 
 // setupTestSession creates a test config manager with a temporary directory
@@ -70,7 +73,7 @@ func TestPropertySessionMarkerCreation(t *testing.T) {
 		beforeTime := time.Now().Add(-time.Second)
 
 		// Create session marker
-		err := cm.CreateSessionMarker(pid, alias)
+		err := session.CreateSessionMarker(cm.configPath, pid, alias)
 		if err != nil {
 			t.Logf("CreateSessionMarker failed: %v", err)
 			return false
@@ -88,7 +91,7 @@ func TestPropertySessionMarkerCreation(t *testing.T) {
 		}
 
 		// Parse the session marker
-		var marker SessionMarker
+		var marker session.SessionMarker
 		if err := json.Unmarshal(data, &marker); err != nil {
 			t.Logf("Failed to parse session marker: %v", err)
 			return false
@@ -131,7 +134,7 @@ func TestCleanupSession(t *testing.T) {
 
 	// Create a session marker
 	pid := "12345"
-	err := cm.CreateSessionMarker(pid, "test-alias")
+	err := session.CreateSessionMarker(cm.configPath, pid, "test-alias")
 	if err != nil {
 		t.Fatalf("Failed to create session marker: %v", err)
 	}
@@ -143,7 +146,7 @@ func TestCleanupSession(t *testing.T) {
 	}
 
 	// Clean up the session
-	err = cm.CleanupSession(pid)
+	err = session.CleanupSession(cm.configPath, pid)
 	if err != nil {
 		t.Fatalf("Failed to cleanup session: %v", err)
 	}
@@ -154,7 +157,7 @@ func TestCleanupSession(t *testing.T) {
 	}
 
 	// Cleanup of non-existent session should not error
-	err = cm.CleanupSession("99999")
+	err = session.CleanupSession(cm.configPath, "99999")
 	if err != nil {
 		t.Errorf("Cleanup of non-existent session should not error: %v", err)
 	}
@@ -165,7 +168,7 @@ func TestHasActiveLocalSessions(t *testing.T) {
 	cm, tempDir := setupTestSession(t)
 
 	// Initially no sessions
-	hasActive, err := cm.HasActiveLocalSessions()
+	hasActive, err := session.HasActiveLocalSessions(cm.configPath)
 	if err != nil {
 		t.Fatalf("HasActiveLocalSessions failed: %v", err)
 	}
@@ -175,13 +178,13 @@ func TestHasActiveLocalSessions(t *testing.T) {
 
 	// Create a session marker with current process PID (which is running)
 	currentPID := strconv.Itoa(os.Getpid())
-	err = cm.CreateSessionMarker(currentPID, "test-alias")
+	err = session.CreateSessionMarker(cm.configPath, currentPID, "test-alias")
 	if err != nil {
 		t.Fatalf("Failed to create session marker: %v", err)
 	}
 
 	// Now should have active session
-	hasActive, err = cm.HasActiveLocalSessions()
+	hasActive, err = session.HasActiveLocalSessions(cm.configPath)
 	if err != nil {
 		t.Fatalf("HasActiveLocalSessions failed: %v", err)
 	}
@@ -192,12 +195,12 @@ func TestHasActiveLocalSessions(t *testing.T) {
 	// Create a stale session marker with non-existent PID
 	stalePID := "999999999" // Very unlikely to be a real PID
 	staleMarkerPath := filepath.Join(tempDir, "session-"+stalePID)
-	staleMarker := SessionMarker{PID: stalePID, Alias: "stale", Timestamp: time.Now()}
+	staleMarker := session.SessionMarker{PID: stalePID, Alias: "stale", Timestamp: time.Now()}
 	data, _ := json.Marshal(staleMarker)
 	os.WriteFile(staleMarkerPath, data, 0600)
 
 	// HasActiveLocalSessions should clean up stale session
-	hasActive, err = cm.HasActiveLocalSessions()
+	hasActive, err = session.HasActiveLocalSessions(cm.configPath)
 	if err != nil {
 		t.Fatalf("HasActiveLocalSessions failed: %v", err)
 	}
@@ -211,7 +214,7 @@ func TestHasActiveLocalSessions(t *testing.T) {
 	}
 
 	// Clean up current session
-	cm.CleanupSession(currentPID)
+	session.CleanupSession(cm.configPath, currentPID)
 }
 
 // Feature: switch-local-mode-fix, Property 4: Local mode updates Claude Code settings
@@ -269,7 +272,7 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 			model = "claude-" + strconv.Itoa(int(modelBytes[0]%10))
 		}
 
-		cfg := &APIConfig{
+		cfg := &models.APIConfig{
 			Alias:     "test-alias",
 			APIKey:    apiKey,
 			AuthToken: authToken,
@@ -327,14 +330,14 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 		}
 
 		// Verify auth token
-		if authToken != "" {
+		if apiKey == "" && authToken != "" {
 			if env["ANTHROPIC_AUTH_TOKEN"] != authToken {
 				t.Logf("Auth token mismatch: expected %s, got %v", authToken, env["ANTHROPIC_AUTH_TOKEN"])
 				return false
 			}
 		} else {
 			if _, exists := env["ANTHROPIC_AUTH_TOKEN"]; exists {
-				t.Logf("Auth token should not exist when empty")
+				t.Logf("Auth token should not exist when empty or API key is present")
 				return false
 			}
 		}
@@ -418,9 +421,9 @@ func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 
 		// Create config file with global active configuration
 		configPath := filepath.Join(tempDir, "config.json")
-		configFile := File{
+		configFile := models.File{
 			Active: "global-alias",
-			Configs: []APIConfig{
+			Configs: []models.APIConfig{
 				{
 					Alias:     "global-alias",
 					APIKey:    globalAPIKey,
@@ -478,9 +481,14 @@ func TestPropertyRestoreClaudeToGlobal(t *testing.T) {
 		}
 
 		// Verify global auth token
-		if globalAuthToken != "" {
+		if globalAPIKey == "" && globalAuthToken != "" {
 			if env["ANTHROPIC_AUTH_TOKEN"] != globalAuthToken {
 				t.Logf("Auth token mismatch: expected %s, got %v", globalAuthToken, env["ANTHROPIC_AUTH_TOKEN"])
+				return false
+			}
+		} else {
+			if _, exists := env["ANTHROPIC_AUTH_TOKEN"]; exists {
+				t.Logf("Auth token should not exist when empty or API key is present")
 				return false
 			}
 		}
@@ -536,9 +544,9 @@ func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 
 	// Create config file with NO global active configuration
 	configPath := filepath.Join(tempDir, "config.json")
-	configFile := File{
+	configFile := models.File{
 		Active:  "", // No active config
-		Configs: []APIConfig{},
+		Configs: []models.APIConfig{},
 	}
 	configData, _ := json.MarshalIndent(configFile, "", "  ")
 	if err := os.WriteFile(configPath, configData, 0600); err != nil {
@@ -616,7 +624,7 @@ func TestPropertyStaleSessionCleanup(t *testing.T) {
 			stalePIDs[i] = stalePID
 
 			staleMarkerPath := filepath.Join(tempDir, "session-"+stalePID)
-			staleMarker := SessionMarker{
+			staleMarker := session.SessionMarker{
 				PID:       stalePID,
 				Alias:     "stale-alias-" + strconv.Itoa(i),
 				Timestamp: time.Now().Add(-time.Hour), // Created an hour ago
@@ -638,7 +646,7 @@ func TestPropertyStaleSessionCleanup(t *testing.T) {
 		}
 
 		// Call HasActiveLocalSessions which should clean up stale sessions
-		hasActive, err := cm.HasActiveLocalSessions()
+		hasActive, err := session.HasActiveLocalSessions(cm.configPath)
 		if err != nil {
 			t.Logf("HasActiveLocalSessions failed: %v", err)
 			return false
@@ -679,7 +687,7 @@ func TestPropertyMixedSessionCleanup(t *testing.T) {
 
 	// Create an active session marker with current process PID (which is running)
 	currentPID := strconv.Itoa(os.Getpid())
-	err := cm.CreateSessionMarker(currentPID, "active-alias")
+	err := session.CreateSessionMarker(cm.configPath, currentPID, "active-alias")
 	if err != nil {
 		t.Fatalf("Failed to create active session marker: %v", err)
 	}
@@ -688,7 +696,7 @@ func TestPropertyMixedSessionCleanup(t *testing.T) {
 	stalePIDs := []string{"900000001", "900000002", "900000003"}
 	for _, stalePID := range stalePIDs {
 		staleMarkerPath := filepath.Join(tempDir, "session-"+stalePID)
-		staleMarker := SessionMarker{
+		staleMarker := session.SessionMarker{
 			PID:       stalePID,
 			Alias:     "stale-alias",
 			Timestamp: time.Now().Add(-time.Hour),
@@ -700,7 +708,7 @@ func TestPropertyMixedSessionCleanup(t *testing.T) {
 	}
 
 	// Call HasActiveLocalSessions
-	hasActive, err := cm.HasActiveLocalSessions()
+	hasActive, err := session.HasActiveLocalSessions(cm.configPath)
 	if err != nil {
 		t.Fatalf("HasActiveLocalSessions failed: %v", err)
 	}
@@ -725,7 +733,7 @@ func TestPropertyMixedSessionCleanup(t *testing.T) {
 	}
 
 	// Clean up active session
-	cm.CleanupSession(currentPID)
+	session.CleanupSession(cm.configPath, currentPID)
 }
 
 // Feature: switch-local-mode-fix, Property 14: Cleanup-session removes marker
@@ -756,7 +764,7 @@ func TestPropertyCleanupSessionRemovesMarker(t *testing.T) {
 		cm := &Manager{configPath: configPath}
 
 		// Create session marker first
-		err := cm.CreateSessionMarker(pid, alias)
+		err := session.CreateSessionMarker(cm.configPath, pid, alias)
 		if err != nil {
 			t.Logf("CreateSessionMarker failed: %v", err)
 			return false
@@ -770,7 +778,7 @@ func TestPropertyCleanupSessionRemovesMarker(t *testing.T) {
 		}
 
 		// Cleanup the session
-		err = cm.CleanupSession(pid)
+		err = session.CleanupSession(cm.configPath, pid)
 		if err != nil {
 			t.Logf("CleanupSession failed: %v", err)
 			return false
@@ -820,7 +828,7 @@ func TestPropertyCleanupSessionNonExistent(t *testing.T) {
 		}
 
 		// Cleanup the session (should not error even though marker doesn't exist)
-		err := cm.CleanupSession(pid)
+		err := session.CleanupSession(cm.configPath, pid)
 		if err != nil {
 			t.Logf("CleanupSession should not error for non-existent marker: %v", err)
 			return false

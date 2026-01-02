@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"apimgr/config"
+	"apimgr/config/models"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -125,7 +125,7 @@ func (m Model) getEffectiveWidth(defaultWidth int) int {
 }
 
 // renderConfigLine renders a single config line in the list
-func (m Model) renderConfigLine(index int, cfg config.APIConfig) string {
+func (m Model) renderConfigLine(index int, cfg models.APIConfig) string {
 	isSelected := index == m.cursor
 	isActive := cfg.Alias == m.activeAlias
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/compatibility"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -43,7 +44,7 @@ const (
 
 // Model is the core state model for TUI
 type Model struct {
-	configs       []config.APIConfig // Config list
+	configs       []models.APIConfig // Config list
 	activeAlias   string             // Current active config alias
 	cursor        int                // Current cursor position
 	selected      int                // Currently selected config index
@@ -109,7 +110,7 @@ type TestResult struct {
 // NewModel creates a new TUI model
 func NewModel(cm *config.Manager) Model {
 	return Model{
-		configs:           []config.APIConfig{},
+		configs:           []models.APIConfig{},
 		cursor:            0,
 		selected:          -1,
 		viewState:         ViewMain,
@@ -754,7 +755,7 @@ func loadConfigs(cm *config.Manager) tea.Cmd {
 type errMsg string
 
 // switchLocalConfig creates a command to switch config locally (Claude Code only)
-func switchLocalConfig(cm *config.Manager, cfg *config.APIConfig) tea.Cmd {
+func switchLocalConfig(cm *config.Manager, cfg *models.APIConfig) tea.Cmd {
 	return func() tea.Msg {
 		err := cm.SyncClaudeSettingsOnly(cfg)
 		if err != nil {
@@ -893,7 +894,7 @@ func (m *Model) initEditForm() {
 // Requirements: 5.3
 func (m *Model) submitAddForm(data FormData) tea.Cmd {
 	return func() tea.Msg {
-		newConfig := config.APIConfig{
+		newConfig := models.APIConfig{
 			Alias:     strings.TrimSpace(data.Alias),
 			APIKey:    strings.TrimSpace(data.APIKey),
 			AuthToken: strings.TrimSpace(data.AuthToken),
@@ -1067,7 +1068,7 @@ func (m *Model) adjustHelpScrollOffset() {
 
 // initModelSelect initializes the model selection view
 // Requirements: 12.1, 12.2
-func (m *Model) initModelSelect(cfg config.APIConfig) {
+func (m *Model) initModelSelect(cfg models.APIConfig) {
 	m.modelList = cfg.Models
 	m.modelCursor = 0
 	// Find current active model position
@@ -1334,7 +1335,7 @@ func switchModelAndSync(cm *config.Manager, alias string, model string, isLocal 
 
 // pingConfig creates a command to perform a ping test on a configuration
 // Requirements: 8.1, 8.2, 8.3, 8.4
-func pingConfig(cfg *config.APIConfig) tea.Cmd {
+func pingConfig(cfg *models.APIConfig) tea.Cmd {
 	return func() tea.Msg {
 		return performPingTest(cfg)
 	}
@@ -1342,7 +1343,7 @@ func pingConfig(cfg *config.APIConfig) tea.Cmd {
 
 // performPingTest performs the actual ping test
 // Requirements: 8.1, 8.2, 8.3, 8.4
-func performPingTest(cfg *config.APIConfig) PingResultMsg {
+func performPingTest(cfg *models.APIConfig) PingResultMsg {
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
 		baseURL = "https://api.anthropic.com"
@@ -1450,7 +1451,7 @@ func (m Model) handlePingResultViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // runCompatibilityTest creates a command to perform a compatibility test on a configuration
 // Requirements: 9.1, 9.2, 9.3, 9.4
-func runCompatibilityTest(cfg *config.APIConfig) tea.Cmd {
+func runCompatibilityTest(cfg *models.APIConfig) tea.Cmd {
 	return func() tea.Msg {
 		tester, err := compatibility.NewTester(cfg)
 		if err != nil {

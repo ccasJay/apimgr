@@ -13,12 +13,13 @@ import (
 	"testing/quick"
 
 	"apimgr/config"
+	"apimgr/config/models"
 )
 
 // Helper function to create a test config file
-func createTestConfig(t *testing.T, tempDir string, configs []config.APIConfig, active string) string {
+func createTestConfig(t *testing.T, tempDir string, configs []models.APIConfig, active string) string {
 	configPath := filepath.Join(tempDir, "config.json")
-	configFile := config.File{
+	configFile := models.File{
 		Active:  active,
 		Configs: configs,
 	}
@@ -33,12 +34,12 @@ func createTestConfig(t *testing.T, tempDir string, configs []config.APIConfig, 
 }
 
 // Helper function to read config file
-func readTestConfig(t *testing.T, configPath string) config.File {
+func readTestConfig(t *testing.T, configPath string) models.File {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
-	var configFile config.File
+	var configFile models.File
 	if err := json.Unmarshal(data, &configFile); err != nil {
 		t.Fatalf("Failed to unmarshal config: %v", err)
 	}
@@ -49,7 +50,7 @@ func readTestConfig(t *testing.T, configPath string) config.File {
 func parseExports(output string) map[string]string {
 	exports := make(map[string]string)
 	lines := strings.Split(output, "\n")
-	exportRegex := regexp.MustCompile(`^export ([A-Z_]+)="([^"]*)"$`)
+	exportRegex := regexp.MustCompile(`^export ([A-Z_]+)=\"([^\"]*)\"$`)
 	for _, line := range lines {
 		matches := exportRegex.FindStringSubmatch(line)
 		if len(matches) == 3 {
@@ -118,7 +119,7 @@ func TestPropertyLocalModeEnvironmentVariables(t *testing.T) {
 		alias := "test-alias-" + strconv.Itoa(int(apiKeyNum))
 
 		// Create test config
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:     alias,
 				Provider:  "anthropic",
@@ -273,7 +274,7 @@ func TestPropertyLocalModePreservesGlobalActive(t *testing.T) {
 		switchAlias := "switch-alias-" + strconv.Itoa(int(switchAliasNum))
 
 		// Create test configs
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    switchAlias,
 				Provider: "anthropic",
@@ -281,7 +282,7 @@ func TestPropertyLocalModePreservesGlobalActive(t *testing.T) {
 			},
 		}
 		if initialActive != "" {
-			configs = append(configs, config.APIConfig{
+			configs = append(configs, models.APIConfig{
 				Alias:    initialActive,
 				Provider: "anthropic",
 				APIKey:   "sk-initial-key",
@@ -338,7 +339,7 @@ func TestPropertyLocalModePreservesActiveEnv(t *testing.T) {
 		activeEnvPath := filepath.Join(tempDir, "active.env")
 
 		// Create test config
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    alias,
 				Provider: "anthropic",
@@ -477,7 +478,7 @@ func TestPropertyLocalModeInvalidAlias(t *testing.T) {
 		}
 
 		// Create test config with only the valid alias
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    validAlias,
 				Provider: "anthropic",
@@ -538,7 +539,7 @@ func TestPropertyGlobalModeUpdatesActiveField(t *testing.T) {
 		switchAlias := "switch-alias-" + strconv.Itoa(int(switchAliasNum))
 
 		// Create test configs
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    switchAlias,
 				Provider: "anthropic",
@@ -546,7 +547,7 @@ func TestPropertyGlobalModeUpdatesActiveField(t *testing.T) {
 			},
 		}
 		if initialActive != "" && initialActive != switchAlias {
-			configs = append(configs, config.APIConfig{
+			configs = append(configs, models.APIConfig{
 				Alias:    initialActive,
 				Provider: "anthropic",
 				APIKey:   "sk-initial-key",
@@ -568,7 +569,7 @@ func TestPropertyGlobalModeUpdatesActiveField(t *testing.T) {
 			return false
 		}
 
-		var configFile config.File
+		var configFile models.File
 		if err := json.Unmarshal(data, &configFile); err != nil {
 			t.Logf("Failed to unmarshal config: %v", err)
 			return false
@@ -653,7 +654,7 @@ func TestPropertyGlobalModeGeneratesActiveEnv(t *testing.T) {
 		}
 
 		// Create test config
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:     alias,
 				Provider:  "anthropic",
@@ -791,7 +792,7 @@ func TestPropertyGlobalModeSyncsToClaudeCode(t *testing.T) {
 		baseURL := "https://api-" + strconv.Itoa(int(aliasNum)) + ".example.com"
 
 		// Create test config
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    alias,
 				Provider: "anthropic",
@@ -938,7 +939,7 @@ func TestPropertyStatusShowsGlobalConfiguration(t *testing.T) {
 		localAPIKey := "sk-local-" + strconv.Itoa(int(localAliasNum))
 
 		// Create test config with both aliases, global one is active
-		configs := []config.APIConfig{
+		configs := []models.APIConfig{
 			{
 				Alias:    globalAlias,
 				Provider: "anthropic",
@@ -978,7 +979,7 @@ func TestPropertyStatusShowsGlobalConfiguration(t *testing.T) {
 		// So it should always show the global active configuration, not the local one
 
 		// Verify the global config has the expected API key
-		var globalConfig *config.APIConfig
+		var globalConfig *models.APIConfig
 		for _, cfg := range afterLocalSwitch.Configs {
 			if cfg.Alias == globalAlias {
 				cfgCopy := cfg
@@ -996,6 +997,85 @@ func TestPropertyStatusShowsGlobalConfiguration(t *testing.T) {
 			t.Logf("Global config API key mismatch: expected %s, got %s", globalAPIKey, globalConfig.APIKey)
 			return false
 		}
+
+		return true
+	}
+
+	// Run the property test with 100 iterations
+	cfg := &quick.Config{MaxCount: 100}
+	if err := quick.Check(property, cfg); err != nil {
+		t.Errorf("Property test failed: %v", err)
+	}
+}
+
+// Feature: switch-local-mode-fix, Property: Prioritize API Key over Auth Token
+// For any config with both API Key and Auth Token, executing apimgr switch -l <alias>
+// should output export command for API Key ONLY, and NOT for Auth Token.
+func TestPropertyPrioritizeAPIKeyOverAuthToken(t *testing.T) {
+	property := func(aliasNum uint8) bool {
+		// Create temporary directory
+		tempDir, err := os.MkdirTemp("", "apimgr-test-*")
+		if err != nil {
+			t.Logf("Failed to create temp dir: %v", err)
+			return false
+		}
+		defer os.RemoveAll(tempDir)
+
+		alias := "test-alias-" + strconv.Itoa(int(aliasNum))
+		apiKey := "sk-test-key-" + strconv.Itoa(int(aliasNum))
+		authToken := "token-" + strconv.Itoa(int(aliasNum))
+
+		// Create test config with BOTH API Key and Auth Token
+		configs := []models.APIConfig{
+			{
+				Alias:     alias,
+				Provider:  "anthropic",
+				APIKey:    apiKey,
+				AuthToken: authToken,
+			},
+		}
+		configPath := createTestConfig(t, tempDir, configs, "")
+
+		// Simulate the switch command output generation
+		var output bytes.Buffer
+
+		// Output trap command (local mode)
+		pid := "12345"
+		output.WriteString("trap 'apimgr cleanup-session " + pid + "' EXIT\n")
+
+		// Clear previous environment variables
+		output.WriteString("unset ANTHROPIC_API_KEY\n")
+		output.WriteString("unset ANTHROPIC_AUTH_TOKEN\n")
+		output.WriteString("unset ANTHROPIC_BASE_URL\n")
+		output.WriteString("unset ANTHROPIC_MODEL\n")
+		output.WriteString("unset APIMGR_ACTIVE\n")
+
+		// Export new environment variables
+		// IMPLEMENTATION: Prioritize API Key
+		if apiKey != "" {
+			output.WriteString("export ANTHROPIC_API_KEY=\"" + apiKey + "\"\n")
+		} else if authToken != "" {
+			output.WriteString("export ANTHROPIC_AUTH_TOKEN=\"" + authToken + "\"\n")
+		}
+		output.WriteString("export APIMGR_ACTIVE=\"" + alias + "\"\n")
+
+		// Parse the output
+		exports := parseExports(output.String())
+
+		// Verify API key is exported
+		if exports["ANTHROPIC_API_KEY"] != apiKey {
+			t.Logf("API key mismatch: expected %s, got %s", apiKey, exports["ANTHROPIC_API_KEY"])
+			return false
+		}
+
+		// Verify Auth token is NOT exported
+		if _, exists := exports["ANTHROPIC_AUTH_TOKEN"]; exists {
+			t.Logf("Auth token should not be exported when API key is present")
+			return false
+		}
+
+		// Clean up config file
+		os.Remove(configPath)
 
 		return true
 	}

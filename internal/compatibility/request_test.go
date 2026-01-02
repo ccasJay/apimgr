@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/providers"
 
 	"github.com/leanovate/gopter"
@@ -49,7 +49,7 @@ func TestProperty1_ProviderSpecificRequestFormat(t *testing.T) {
 	// Property: Anthropic configs produce Messages API format with x-api-key header
 	properties.Property("anthropic config produces correct format", prop.ForAll(
 		func(apiKey string, authToken string, baseURL string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider:  "anthropic",
 				APIKey:    apiKey,
 				AuthToken: authToken,
@@ -128,7 +128,7 @@ func TestProperty1_ProviderSpecificRequestFormat(t *testing.T) {
 	// Property: OpenAI configs produce Chat Completions API format with Authorization Bearer header
 	properties.Property("openai config produces correct format", prop.ForAll(
 		func(apiKey string, baseURL string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "openai",
 				APIKey:   apiKey,
 				BaseURL:  baseURL,
@@ -203,7 +203,7 @@ func TestProperty1_ProviderSpecificRequestFormat(t *testing.T) {
 				return false
 			}
 
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 				BaseURL:  provider.DefaultBaseURL(),
@@ -248,7 +248,7 @@ func TestProperty4_StreamingRequestConstruction(t *testing.T) {
 	// Property: Streaming requests include stream: true for Anthropic
 	properties.Property("anthropic streaming request includes stream true", prop.ForAll(
 		func(apiKey string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "anthropic",
 				APIKey:   apiKey,
 			}
@@ -281,7 +281,7 @@ func TestProperty4_StreamingRequestConstruction(t *testing.T) {
 	// Property: Streaming requests include stream: true for OpenAI
 	properties.Property("openai streaming request includes stream true", prop.ForAll(
 		func(apiKey string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "openai",
 				APIKey:   apiKey,
 			}
@@ -314,7 +314,7 @@ func TestProperty4_StreamingRequestConstruction(t *testing.T) {
 	// Property: Non-streaming requests do not include stream: true
 	properties.Property("non-streaming request does not include stream true", prop.ForAll(
 		func(providerName string, apiKey string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 			}
@@ -395,7 +395,7 @@ func TestProperty8_CustomPathOverride(t *testing.T) {
 	// Property: Custom path overrides default endpoint for Anthropic
 	properties.Property("custom path overrides anthropic default endpoint", prop.ForAll(
 		func(apiKey string, customPath string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "anthropic",
 				APIKey:   apiKey,
 				BaseURL:  "https://api.anthropic.com",
@@ -442,7 +442,7 @@ func TestProperty8_CustomPathOverride(t *testing.T) {
 	// Property: Custom path overrides default endpoint for OpenAI
 	properties.Property("custom path overrides openai default endpoint", prop.ForAll(
 		func(apiKey string, customPath string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: "openai",
 				APIKey:   apiKey,
 				BaseURL:  "https://api.openai.com",
@@ -489,7 +489,7 @@ func TestProperty8_CustomPathOverride(t *testing.T) {
 	// Property: Empty custom path falls back to default endpoint
 	properties.Property("empty custom path uses default endpoint", prop.ForAll(
 		func(providerName string, apiKey string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 			}
@@ -528,7 +528,7 @@ func TestProperty8_CustomPathOverride(t *testing.T) {
 	// Property: Custom path works with streaming requests
 	properties.Property("custom path works with streaming requests", prop.ForAll(
 		func(providerName string, apiKey string, customPath string, model string) bool {
-			cfg := &config.APIConfig{
+			cfg := &models.APIConfig{
 				Provider: providerName,
 				APIKey:   apiKey,
 				BaseURL:  "https://api.example.com",

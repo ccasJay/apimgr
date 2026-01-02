@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"apimgr/config"
+	"apimgr/config/models"
+	"apimgr/config/validation"
 	"apimgr/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -164,7 +166,7 @@ func editConfig(alias string) error {
 }
 
 // collectUserEdits handles the interactive editing loop and returns collected updates
-func collectUserEdits(currentConfig *config.APIConfig, configManager *config.Manager) (map[string]string, error) {
+func collectUserEdits(currentConfig *models.APIConfig, configManager *config.Manager) (map[string]string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	updates := make(map[string]string)
 
@@ -245,7 +247,7 @@ func getUserChoice(reader *bufio.Reader) string {
 	return strings.TrimSpace(choice)
 }
 
-func displayConfig(config config.APIConfig) {
+func displayConfig(config models.APIConfig) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Printf("Current configuration: %s\n", config.Alias)
 	fmt.Println(strings.Repeat("=", 60))
@@ -285,7 +287,7 @@ func displayMaskedField(label, value, maskedValue string) {
 	}
 }
 
-func handleFieldSelection(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, choice string, configManager *config.Manager) error {
+func handleFieldSelection(reader *bufio.Reader, currentConfig *models.APIConfig, updates map[string]string, choice string, configManager *config.Manager) error {
 	var fieldType FieldType
 	var fieldName string
 
@@ -325,7 +327,7 @@ func parseFieldChoice(choice string, fieldType *FieldType, fieldName *string) er
 }
 
 // handlePreview displays preview of changes if any
-func handlePreview(currentConfig *config.APIConfig, updates map[string]string) error {
+func handlePreview(currentConfig *models.APIConfig, updates map[string]string) error {
 	if len(updates) == 0 {
 		return fmt.Errorf("No changes yet")
 	}
@@ -333,7 +335,7 @@ func handlePreview(currentConfig *config.APIConfig, updates map[string]string) e
 	return nil
 }
 
-func editField(reader *bufio.Reader, currentConfig *config.APIConfig, updates map[string]string, fieldType FieldType, fieldName string, configManager *config.Manager) error {
+func editField(reader *bufio.Reader, currentConfig *models.APIConfig, updates map[string]string, fieldType FieldType, fieldName string, configManager *config.Manager) error {
 	// Get current value (either from updates or currentConfig)
 	currentValue := getCurrentValue(currentConfig, updates, fieldType)
 	prompt := fmt.Sprintf("\nCurrent %s: %s\nEnter new %s (press Enter to keep unchanged): ", fieldName, currentValue, fieldName)
@@ -367,7 +369,7 @@ func editField(reader *bufio.Reader, currentConfig *config.APIConfig, updates ma
 	return nil
 }
 
-func getCurrentValue(config *config.APIConfig, updates map[string]string, fieldType FieldType) string {
+func getCurrentValue(config *models.APIConfig, updates map[string]string, fieldType FieldType) string {
 	key := getFieldKey(fieldType)
 	if val, ok := updates[key]; ok {
 		return val
@@ -414,7 +416,7 @@ func isSensitiveField(fieldType FieldType) bool {
 	return fieldType == FieldAPIKey || fieldType == FieldAuthToken
 }
 
-func validateFieldValue(fieldType FieldType, value string, currentConfig *config.APIConfig, configManager *config.Manager) error {
+func validateFieldValue(fieldType FieldType, value string, currentConfig *models.APIConfig, configManager *config.Manager) error {
 	switch fieldType {
 	case FieldAlias:
 		// Check if alias already exists (excluding current config)
@@ -438,7 +440,7 @@ func validateFieldValue(fieldType FieldType, value string, currentConfig *config
 	case FieldModels:
 		// Validate models list using ModelValidator
 		models := parseModelsList(value)
-		validator := config.NewModelValidator()
+		validator := validation.NewModelValidator()
 		if err := validator.ValidateModelsList(models); err != nil {
 			return err
 		}
@@ -446,7 +448,7 @@ func validateFieldValue(fieldType FieldType, value string, currentConfig *config
 	return nil
 }
 
-func getOtherAuthValue(fieldType FieldType, config *config.APIConfig, newValue string) string {
+func getOtherAuthValue(fieldType FieldType, config *models.APIConfig, newValue string) string {
 	if fieldType == FieldAPIKey {
 		// After update, api_key will be newValue, check if auth_token is set
 		return config.AuthToken
@@ -455,7 +457,7 @@ func getOtherAuthValue(fieldType FieldType, config *config.APIConfig, newValue s
 	return config.APIKey
 }
 
-func previewChanges(currentConfig config.APIConfig, updates map[string]string) {
+func previewChanges(currentConfig models.APIConfig, updates map[string]string) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("Preview changes:")
 	fmt.Println(strings.Repeat("=", 60))

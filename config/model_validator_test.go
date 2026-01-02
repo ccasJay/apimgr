@@ -3,10 +3,12 @@ package config
 import (
 	"reflect"
 	"testing"
+
+	"apimgr/config/validation"
 )
 
 func TestValidateModelInList(t *testing.T) {
-	v := NewModelValidator()
+	v := validation.NewModelValidator()
 
 	tests := []struct {
 		name    string
@@ -63,7 +65,7 @@ func TestValidateModelInList(t *testing.T) {
 }
 
 func TestValidateModelsList(t *testing.T) {
-	v := NewModelValidator()
+	v := validation.NewModelValidator()
 
 	tests := []struct {
 		name    string
@@ -113,7 +115,7 @@ func TestValidateModelsList(t *testing.T) {
 }
 
 func TestNormalizeModels(t *testing.T) {
-	v := NewModelValidator()
+	v := validation.NewModelValidator()
 
 	tests := []struct {
 		name   string

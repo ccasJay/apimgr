@@ -3,13 +3,13 @@ package tui
 import (
 	"time"
 
-	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/compatibility"
 )
 
 // ConfigsLoadedMsg is sent when configs are loaded
 type ConfigsLoadedMsg struct {
-	Configs     []config.APIConfig
+	Configs     []models.APIConfig
 	ActiveAlias string
 }
 
@@ -22,7 +22,7 @@ type ConfigSwitchedMsg struct {
 
 // ConfigAddedMsg is sent when a config is added
 type ConfigAddedMsg struct {
-	Config config.APIConfig
+	Config models.APIConfig
 	Err    error
 }
 

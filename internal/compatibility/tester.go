@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"apimgr/config"
+	"apimgr/config/models"
 	"apimgr/internal/providers"
 )
 
@@ -75,7 +75,7 @@ func DetectProviderFromURL(baseURL string) (string, bool) {
 // Tester coordinates compatibility testing for API configurations
 type Tester struct {
 	client     *http.Client
-	config     *config.APIConfig
+	config     *models.APIConfig
 	provider   providers.Provider
 	verbose    bool
 	customPath string
@@ -108,7 +108,7 @@ func WithHTTPClient(client *http.Client) TesterOption {
 // NewTester creates a new compatibility tester for the given API configuration.
 // It resolves the provider based on the config's Provider field, or auto-detects
 // from the base URL if the provider is not explicitly set.
-func NewTester(cfg *config.APIConfig, opts ...TesterOption) (*Tester, error) {
+func NewTester(cfg *models.APIConfig, opts ...TesterOption) (*Tester, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
@@ -533,7 +533,7 @@ func (t *Tester) GetProvider() providers.Provider {
 }
 
 // GetConfig returns the API configuration for this tester
-func (t *Tester) GetConfig() *config.APIConfig {
+func (t *Tester) GetConfig() *models.APIConfig {
 	return t.config
 }
 

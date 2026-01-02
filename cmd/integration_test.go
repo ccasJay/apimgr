@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config"
+	"apimgr/config/models"
+	"apimgr/config/session"
 )
 
 // Integration tests for the switch-local-mode-fix feature
@@ -52,10 +53,10 @@ func setupIntegrationTestEnv(t *testing.T) (string, string, string, func()) {
 }
 
 // createIntegrationTestConfig creates a test config file with multiple aliases
-func createIntegrationTestConfig(t *testing.T, configPath string, configs []config.APIConfig, active string) {
+func createIntegrationTestConfig(t *testing.T, configPath string, configs []models.APIConfig, active string) {
 	t.Helper()
 
-	configFile := config.File{
+	configFile := models.File{
 		Active:  active,
 		Configs: configs,
 	}
@@ -100,14 +101,14 @@ func readClaudeSettings(t *testing.T, claudeSettingsPath string) map[string]inte
 }
 
 // readConfigFile reads and parses the config file
-func readConfigFile(t *testing.T, configPath string) config.File {
+func readConfigFile(t *testing.T, configPath string) models.File {
 	t.Helper()
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
-	var configFile config.File
+	var configFile models.File
 	if err := json.Unmarshal(data, &configFile); err != nil {
 		t.Fatalf("Failed to parse config file: %v", err)
 	}
@@ -130,7 +131,7 @@ func TestIntegrationEndToEndLocalMode(t *testing.T) {
 	configDir := filepath.Dir(configPath)
 
 	// Create test config with multiple aliases
-	configs := []config.APIConfig{
+	configs := []models.APIConfig{
 		{
 			Alias:    "alias1",
 			Provider: "anthropic",
@@ -176,7 +177,7 @@ func TestIntegrationEndToEndLocalMode(t *testing.T) {
 
 	// Create session marker (simulating what switch -l does)
 	markerPath := filepath.Join(configDir, "session-"+testPID)
-	marker := config.SessionMarker{
+	marker := session.SessionMarker{
 		PID:   testPID,
 		Alias: testAlias,
 	}
@@ -250,7 +251,7 @@ func TestIntegrationMultiTerminalIsolation(t *testing.T) {
 	configDir := filepath.Dir(configPath)
 
 	// Create test config with global active
-	configs := []config.APIConfig{
+	configs := []models.APIConfig{
 		{
 			Alias:    "local-alias",
 			Provider: "anthropic",
@@ -277,7 +278,7 @@ func TestIntegrationMultiTerminalIsolation(t *testing.T) {
 	
 	// Create session marker for terminal 1
 	marker1Path := filepath.Join(configDir, "session-"+terminal1PID)
-	marker1 := config.SessionMarker{
+	marker1 := session.SessionMarker{
 		PID:   terminal1PID,
 		Alias: "local-alias",
 	}
@@ -374,7 +375,7 @@ func TestIntegrationGlobalModeUnchanged(t *testing.T) {
 	activeEnvPath := filepath.Join(configDir, "active.env")
 
 	// Create test config with initial global active
-	configs := []config.APIConfig{
+	configs := []models.APIConfig{
 		{
 			Alias:    "new-alias",
 			Provider: "anthropic",
@@ -473,7 +474,7 @@ export APIMGR_ACTIVE="new-alias"
 	}
 
 	// Verify the active config details
-	var activeConfig *config.APIConfig
+	var activeConfig *models.APIConfig
 	for _, cfg := range finalConfig.Configs {
 		if cfg.Alias == finalConfig.Active {
 			activeConfig = &cfg
@@ -604,7 +605,7 @@ func TestIntegrationStaleSessionCleanup(t *testing.T) {
 	// Use a very high PID that's unlikely to exist
 	stalePID := "999999999"
 	staleMarkerPath := filepath.Join(configDir, "session-"+stalePID)
-	staleMarker := config.SessionMarker{
+	staleMarker := session.SessionMarker{
 		PID:   stalePID,
 		Alias: "stale-alias",
 	}
@@ -619,7 +620,7 @@ func TestIntegrationStaleSessionCleanup(t *testing.T) {
 	}
 
 	// Create a config file
-	configs := []config.APIConfig{
+	configs := []models.APIConfig{
 		{
 			Alias:    "test-alias",
 			Provider: "anthropic",

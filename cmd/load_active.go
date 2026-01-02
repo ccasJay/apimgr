@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"apimgr/config"
+	"apimgr/config/session"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,7 @@ var loadActiveCmd = &cobra.Command{
 
 		// Check for active local sessions and clean up stale ones
 		// This also restores Claude Code to global config if there are active sessions
-		hasActiveSessions, err := configManager.HasActiveLocalSessions()
+		hasActiveSessions, err := session.HasActiveLocalSessions(configManager.GetConfigPath())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to check for active sessions: %v\n", err)
 		}
@@ -59,8 +60,7 @@ var loadActiveCmd = &cobra.Command{
 		// Export environment variables for the global active configuration
 		if apiConfig.APIKey != "" {
 			fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
-		}
-		if apiConfig.AuthToken != "" {
+		} else if apiConfig.AuthToken != "" {
 			fmt.Printf("export ANTHROPIC_AUTH_TOKEN=\"%s\"\n", apiConfig.AuthToken)
 		}
 		if apiConfig.BaseURL != "" {
