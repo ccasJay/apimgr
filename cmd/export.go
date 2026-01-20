@@ -13,17 +13,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	exportFile string
+)
+
 var exportCmd = &cobra.Command{
 	Use:   "export [alias]",
 	Short: "Export API configurations as encrypted string",
 	Long: `Export API configurations as an encrypted Base64 string for cross-device sync.
 
 Usage:
-  apimgr export              # Export all configurations
-  apimgr export my-config    # Export single configuration by alias
+  apimgr export                    # Export all configurations
+  apimgr export my-config          # Export single configuration by alias
+  apimgr export --file output.txt  # Export to file (avoids for terminal input limits)
 
 The encrypted string can be copied and imported on another device using:
   apimgr import
+
+Or use file mode to avoid terminal input limits:
+  apimgr export --file output.txt
+  apimgr import --file output.txt
 
 Security:
   - Password-based encryption using PBKDF2 and AES-256-GCM
@@ -121,13 +130,13 @@ func runExport(args []string) error {
 	}
 
 	// Display results
-	displayExportResults(configs, encrypted)
+	displayExportResults(configs, encrypted, exportFile)
 
 	return nil
 }
 
 // displayExportResults displays the export results in a formatted way
-func displayExportResults(configs []models.APIConfig, encrypted string) {
+func displayExportResults(configs []models.APIConfig, encrypted string, file string) {
 	width := 70
 	border := strings.Repeat("=", width)
 
@@ -157,6 +166,18 @@ func displayExportResults(configs []models.APIConfig, encrypted string) {
 
 	fmt.Println(strings.Repeat("-", width))
 
+	if file != "" {
+		// Write to file
+		if err := os.WriteFile(file, []byte(encrypted), 0600); err != nil {
+			fmt.Printf("\n⚠️  Warning: Failed to write to file: %v\n", err)
+		} else {
+			fmt.Printf("\n✅ Exported to file: %s\n", file)
+			fmt.Println("\nTo import on another device:")
+			fmt.Printf("  apimgr import --file %s\n", file)
+			return
+		}
+	}
+
 	fmt.Println("\nTo import on another device:")
 	fmt.Println("  apimgr import")
 }
@@ -183,4 +204,5 @@ func wrapString(s string, width int) string {
 
 func init() {
 	rootCmd.AddCommand(exportCmd)
+	exportCmd.Flags().StringVarP(&exportFile, "file", "f", "", "Export to file instead of stdout (avoids terminal input limits)")
 }

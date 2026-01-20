@@ -15,7 +15,8 @@ import (
 var (
 	importSkip      bool
 	importOverwrite bool
-	importDryRun   bool
+	importDryRun    bool
+	importFile      string
 )
 
 // readMultiLine reads multiple lines from stdin until an empty line is encountered
@@ -51,13 +52,18 @@ var importCmd = &cobra.Command{
 	Long: `Import API configurations from an encrypted Base64 string for cross-device sync.
 
 Usage:
-  apimgr import              # Interactive mode (prompt for conflicts)
-  apimgr import --skip      # Skip existing configurations
-  apimgr import --overwrite  # Overwrite existing configurations
-  apimgr import --dry-run   # Preview without importing
+  apimgr import                        # Interactive mode (prompt for conflicts)
+  apimgr import --skip                  # Skip existing configurations
+  apimgr import --overwrite              # Overwrite existing configurations
+  apimgr import --dry-run               # Preview without importing
+  apimgr import --file exported.txt     # Import from file (avoids terminal input limits)
 
 The encrypted string is obtained using:
   apimgr export [alias]
+
+Or use file mode to avoid terminal input limits:
+  apimgr export --file output.txt
+  apimgr import --file output.txt
 
 Conflict Resolution:
   --skip      Skip configurations that already exist (default in interactive mode)
@@ -70,17 +76,30 @@ Conflict Resolution:
 
 func runImport() error {
 	// Check for terminal support
-	if !isTerminal() {
+	if !isTerminal() && importFile == "" {
 		return fmt.Errorf("interactive input required for import command")
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 
 	// Get encrypted string
-	fmt.Print("Paste encrypted string (press Enter twice to finish): ")
-	encrypted, err := readMultiLine(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read encrypted string: %w", err)
+	var encrypted string
+	var err error
+
+	if importFile != "" {
+		// Read from file
+		data, err := os.ReadFile(importFile)
+		if err != nil {
+			return fmt.Errorf("failed to read file: %w", err)
+		}
+		encrypted = strings.Trim(string(data), "\n\r\t ")
+	} else {
+		// Read from stdin (interactive mode)
+		fmt.Print("Paste encrypted string (press Enter twice to finish): ")
+		encrypted, err = readMultiLine(reader)
+		if err != nil {
+			return fmt.Errorf("failed to read encrypted string: %w", err)
+		}
 	}
 
 	if encrypted == "" {
@@ -330,4 +349,5 @@ func init() {
 	importCmd.Flags().BoolVar(&importSkip, "skip", false, "Skip existing configurations")
 	importCmd.Flags().BoolVar(&importOverwrite, "overwrite", false, "Overwrite existing configurations")
 	importCmd.Flags().BoolVar(&importDryRun, "dry-run", false, "Preview without importing")
+	importCmd.Flags().StringVarP(&importFile, "file", "f", "", "Import from file instead of stdin (avoids terminal input limits)")
 }
