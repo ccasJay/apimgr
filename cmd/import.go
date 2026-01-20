@@ -18,6 +18,33 @@ var (
 	importDryRun   bool
 )
 
+// readMultiLine reads multiple lines from stdin until an empty line is encountered
+// Returns the concatenated lines with newlines removed
+func readMultiLine(reader *bufio.Reader) (string, error) {
+	var lines []string
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if len(lines) == 0 {
+				return "", err
+			}
+			break
+		}
+
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" && len(lines) > 0 {
+			// Empty line signals end of input
+			break
+		}
+		if trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+
+	return strings.Join(lines, ""), nil
+}
+
 var importCmd = &cobra.Command{
 	Use:   "import",
 	Short: "Import API configurations from encrypted string",
@@ -50,12 +77,11 @@ func runImport() error {
 	reader := bufio.NewReader(os.Stdin)
 
 	// Get encrypted string
-	fmt.Print("Paste encrypted string: ")
-	encrypted, err := reader.ReadString('\n')
+	fmt.Print("Paste encrypted string (press Enter twice to finish): ")
+	encrypted, err := readMultiLine(reader)
 	if err != nil {
 		return fmt.Errorf("failed to read encrypted string: %w", err)
 	}
-	encrypted = strings.TrimSpace(encrypted)
 
 	if encrypted == "" {
 		return fmt.Errorf("encrypted string cannot be empty")
