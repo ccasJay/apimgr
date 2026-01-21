@@ -1,7 +1,7 @@
 # API Manager Makefile
 
 build:
-	go build -o apimgr .
+	CGO_ENABLED=0 go build -o apimgr .
 
 install: build
 	@echo "✅ apimgr in project directory has been updated"
