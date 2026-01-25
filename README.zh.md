@@ -33,13 +33,17 @@
 ### 方法 1: Go install (推荐)
 
 ```bash
-go install github.com/your-username/apimgr@latest
+go install github.com/ccasJay/apimgr@latest
 ```
 
-### 方法 2: 从源码构建
+### 方法 2: 二进制下载
+
+从 [GitHub Releases](https://github.com/ccasJay/apimgr/releases) 下载适合您系统的预编译二进制文件。
+
+### 方法 3: 从源码构建
 
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
 go build -o apimgr .
 
@@ -47,7 +51,7 @@ go build -o apimgr .
 sudo mv apimgr /usr/local/bin/
 ```
 
-### 方法 3: 使用 Makefile
+### 方法 4: 使用 Makefile
 
 ```bash
 # 构建
@@ -417,7 +421,7 @@ apimgr ping -T -v            # 详细输出（显示请求/响应内容）
 
 ```bash
 # 1. 更新到新版本
-go get -u github.com/yourusername/apimgr
+go install github.com/ccasJay/apimgr@latest
 # 或重新编译
 go build -o apimgr .
 

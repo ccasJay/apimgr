@@ -1,12 +1,24 @@
 # API Manager (apimgr)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/your-username/apimgr)
+[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/ccasJay/apimgr)
 [![Go Version](https://img.shields.io/badge/Go-1.21%2B-blue)](https://golang.org/)
 
 [中文版](README.zh.md)
 
-A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.(This project is only compatible with Claude Code for the time being, more tools like codex or gemini will be available in the future. )
+## Overview
+
+A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.
+
+**Key Highlights:**
+- 🎨 **Beautiful TUI**: Full-featured terminal user interface with keyboard shortcuts
+- 🔄 **Multi-Provider**: Support for Anthropic, OpenAI, and custom API providers  
+- 🔐 **Secure**: Encrypted key storage with file permission controls
+- 🚀 **Fast**: Instant configuration switching with shell integration
+- 🧪 **Testing**: Built-in connectivity and compatibility testing
+- 📦 **Cross-Platform**: Native support for macOS, Linux, and Windows
+
+> **Note**: This project currently focuses on Claude Code integration, with plans to support more AI coding tools in the future.
 
 
 
@@ -46,15 +58,17 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ## Installation
 
 ### Prerequisites
-- Go 1.21 or higher (for source compilation)
+- Go 1.21 or higher (for building from source)
 
-### Recommended Installation
-#### Go Install
+### Recommended: Binary Download
+Download pre-built binaries for your platform from the [latest release](https://github.com/ccasJay/apimgr/releases).
+
+### Alternative: Install with Go
 ```bash
-go install https://github.com/ccasJay/apimgr.git
+go install github.com/ccasJay/apimgr@latest
 ```
 
-#### From Source
+### Alternative: Build from Source
 ```bash
 git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
@@ -62,13 +76,12 @@ go build
 sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
 ```
 
-#### Using Makefile
+### Alternative: Using Makefile
 ```bash
 git clone https://github.com/ccasJay/apimgr.git
-
 cd apimgr
 make install  # Builds and installs locally
-# sudo make install  # For system-wide installation
+# For system-wide installation, run: sudo cp apimgr /usr/local/bin/
 ```
 
 ## Quick Start
@@ -326,11 +339,13 @@ Use `apimgr ping -j` for JSON output with full error details:
 
 ## Documentation
 
-- [Quick Start Guide](QUICKSTART.md)
-- [Command Reference](COMMANDS.md) (TODO)
-- [Contribution Guide](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security Policy](SECURITY.md) (TODO)
+- [Quick Start Guide](QUICKSTART.md) - Get started quickly with basic usage
+- [Architecture Guide](ARCHITECTURE.md) - Technical architecture and design details
+- [Contribution Guide](CONTRIBUTING.md) - How to contribute to the project
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community guidelines
+- [Security Policy](SECURITY.md) - Security practices and vulnerability reporting
+- [Changelog](CHANGELOG.md) - Version history and release notes
+- [Code Audit Report](CODE_AUDIT_REPORT.md) - Detailed code quality analysis
 
 ## Contributing
 
@@ -342,4 +357,4 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
-For issues, feature requests, or questions, please open an [issue](https://github.com/your-username/apimgr/issues) on GitHub.
+For issues, feature requests, or questions, please open an [issue](https://github.com/ccasJay/apimgr/issues) on GitHub.

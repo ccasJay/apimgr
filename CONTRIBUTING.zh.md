@@ -37,6 +37,15 @@
 - 为新功能编写单元测试
 - 确保测试覆盖率不低于 80%
 - 运行 `go test ./...` 确保所有测试通过
+- 使用表格驱动测试处理多个测试用例
+- 使用有意义的测试名称描述测试内容
+
+### 提交信息
+- 使用常规提交格式：`type(scope): description`
+- 类型：`feat`、`fix`、`docs`、`style`、`refactor`、`test`、`chore`
+- 示例：`feat(ping): add streaming support for compatibility tests`
+- 保持第一行在 72 个字符以内
+- 如需详细说明，在提交正文中添加
 
 ### 文档
 - 为新命令或功能更新 README.md
@@ -50,27 +59,90 @@
 ## 开发环境
 
 ### 依赖
-- Go 1.21+
-- golangci-lint
-- goreleaser (用于发布)
+- Go 1.21 或更高版本
+- golangci-lint（用于代码检查）
+- goreleaser（可选，用于发布构建）
+
+### 环境设置
+
+1. **Fork 并克隆仓库**
+   ```bash
+   git clone https://github.com/your-username/apimgr.git
+   cd apimgr
+   ```
+
+2. **安装依赖**
+   ```bash
+   go mod download
+   ```
+
+3. **构建项目**
+   ```bash
+   make build
+   # 或
+   go build -o apimgr .
+   ```
+
+4. **运行测试**
+   ```bash
+   go test ./...
+   ```
+
+5. **运行代码检查**
+   ```bash
+   golangci-lint run
+   # 或使用项目配置
+   golangci-lint run --config .golangci.yml
+   ```
 
 ### 常用命令
 ```bash
+# 构建二进制文件
+make build
+# 或
+go build -o apimgr .
+
 # 运行所有测试
 go test ./...
+
+# 运行测试并显示覆盖率
+go test -cover ./...
+
+# 运行测试并显示详细输出
+go test -v ./...
+
+# 运行特定测试
+go test -run TestConfigLoad ./config
+
+# 运行基准测试
+go test -bench=. ./...
 
 # 运行 Lint 检查
 golangci-lint run
 
-# 构建二进制文件
-go build
-
 # 清理构建文件
-go clean
+make clean
+# 或
+rm -f apimgr
 
-# 生成文档
-godoc -http=:6060
+# 本地安装
+make install
 ```
+
+### 项目结构
+```
+apimgr/
+├── cmd/           # CLI 命令
+├── config/        # 配置管理
+├── internal/      # 内部包
+│   ├── providers/ # API 提供商实现
+│   ├── tui/       # 终端 UI
+│   └── utils/     # 工具函数
+├── main.go        # 入口点
+└── ...
+```
+
+详细的架构信息请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 许可证
 
