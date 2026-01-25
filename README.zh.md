@@ -4,9 +4,56 @@
 
 一个用 Go 语言开发的命令行工具，用于管理 API 配置（密钥、基础 URL、模型等）并测试连通性，支持多提供商切换。
 
+## 目录
+
+- [特性](#-特性)
+  - [核心功能](#核心功能)
+  - [高级特性](#高级特性)
+- [安装](#安装)
+  - [环境要求](#环境要求)
+  - [支持的操作系统](#支持的操作系统)
+  - [安装方法](#安装方法)
+- [快速开始](#快速开始)
+  - [TUI 模式（推荐）](#tui-模式推荐)
+  - [命令行模式](#命令行模式)
+- [配置文件](#配置文件)
+  - [配置路径](#配置路径)
+  - [Provider 自动检测](#provider-自动检测)
+- [命令详解](#命令详解)
+  - [TUI 模式](#tui-模式)
+  - [基本命令](#基本命令)
+- [环境变量](#环境变量)
+- [使用示例](#使用示例)
+- [Shell 集成](#shell-集成)
+- [常见问题](#常见问题)
+- [故障排查](#故障排查)
+- [技术架构](#技术架构)
+- [开发](#开发)
+- [许可证](#许可证)
+
 ## ✨ 特性
 
 ### 核心功能
+
+```
+┌─────────────┐        ┌──────────────────┐        ┌─────────────────┐
+│  用户命令   │───────▶│  apimgr CLI/TUI  │───────▶│   配置存储      │
+│             │        │                  │        │   (JSON 文件)   │
+└─────────────┘        └──────────────────┘        └─────────────────┘
+                              │      │
+                              │      │
+                              ▼      ▼
+                       ┌──────────────────┐
+                       │   环境变量       │
+                       │  (active.env)    │
+                       └──────────────────┘
+                              │
+                              ▼
+                       ┌──────────────────┐
+                       │  Claude Code 等  │
+                       │   其他工具       │
+                       └──────────────────┘
+```
 
 - 📁 **多配置管理**: 使用 JSON 文件存储多组 API 配置
 - ⚡ **快速切换**: 使用 `apimgr switch <alias>` 快速切换配置
@@ -19,6 +66,24 @@
 
 ### 高级特性
 
+```
+┌──────────────────────────────────────────────────────────────┐
+│                        配置模式                               │
+├──────────────────────────┬───────────────────────────────────┤
+│   全局模式               │      本地模式 (-l 参数)           │
+│   ┌───────────────┐      │      ┌───────────────┐           │
+│   │ config.json   │──────┼─────▶│  Shell 环境   │           │
+│   │   (持久化)    │      │      │    (临时)     │           │
+│   └───────────────┘      │      └───────────────┘           │
+│          │               │             │                     │
+│          ▼               │             ▼                     │
+│   ┌───────────────┐      │      ┌───────────────┐           │
+│   │  active.env   │      │      │   当前 Shell  │           │
+│   │ (所有 Shell)  │      │      │      专用     │           │
+│   └───────────────┘      │      └───────────────┘           │
+└──────────────────────────┴───────────────────────────────────┘
+```
+
 - 🖥️ **交互式 TUI**: 功能完整的终端用户界面，支持键盘导航（直接运行 `apimgr` 即可启动）
 - 📦 **多提供商支持**: Anthropic、OpenAI 及自定义提供商
 - 📡 **连通性测试**: 使用 `apimgr ping` 测试 API 配置的连通性
@@ -29,6 +94,22 @@
 - 📂 **XDG 规范支持**: 遵循 Linux 上的 XDG Base Directory Specification
 
 ## 安装
+
+### 环境要求
+- **Go 1.21+**: 从源码构建时需要
+- **操作系统**: 支持以下系统之一：
+  - macOS (x86_64/ARM64)
+  - Linux (x86_64/ARM64)
+  - Windows (x86_64)
+
+### 支持的操作系统
+
+apimgr 已在以下系统上测试并支持：
+- **macOS**: 10.15 (Catalina) 或更高版本
+- **Linux**: Ubuntu 20.04+, Debian 10+, Fedora 33+, Arch Linux 及其他现代发行版
+- **Windows**: Windows 10 或更高版本（建议使用 PowerShell 或 WSL2 以获得最佳体验）
+
+### 安装方法
 
 ### 方法 1: Go install (推荐)
 
@@ -93,6 +174,27 @@ apimgr enable
 # 2. 添加 API 配置
 apimgr add my-config --sk sk-xxxxxxxx --url https://api.anthropic.com --model claude-3
 
+**输出示例：**
+```
+✅ Configuration 'my-config' added successfully
+✅ Configuration updated - active.env regenerated
+```
+
+或使用交互式添加：
+```bash
+apimgr add
+```
+
+**交互式输出示例：**
+```
+Enter config alias: my-config
+Enter API key: sk-xxxxxxxx
+Enter Authentication Token (press Enter to skip):
+Enter Base URL (default: https://api.anthropic.com):
+Enter Model name (press Enter to skip): claude-3
+✅ Configuration 'my-config' added successfully
+```
+
 # 3. 切换到新配置
 apimgr switch my-config
 
@@ -104,8 +206,53 @@ apimgr ping              # 基本连通性测试
 apimgr ping -T           # 兼容性测试（自动检测 provider）
 apimgr ping -T --stream  # 测试流式响应兼容性
 
+**成功输出示例：**
+```
+Testing connection to: https://api.anthropic.com
+✅ Connection successful!
+Status: 200 OK
+Response Time: 245ms
+```
+
+**失败输出示例（连接超时）：**
+```
+Testing connection to: https://slow-api.example.com
+❌ Connection failed!
+Error: Request timeout after 10000ms
+
+💡 提示：尝试使用 -t 参数增加超时时间（例如：apimgr ping -t 30s）
+```
+
+**失败输出示例（无法连接到服务器）：**
+```
+Testing connection to: https://api.down-server.com
+❌ Connection failed!
+Error: Connection refused - server is not responding
+
+💡 提示：检查服务器是否运行并且可访问
+```
+
+**失败输出示例（域名解析失败）：**
+```
+Testing connection to: https://invalid-domain.example
+❌ Connection failed!
+Error: DNS resolution failed - no such host
+
+💡 提示：检查网络连接或域名拼写是否正确
+```
+
 # 6. 列出所有配置
 apimgr list
+
+**输出示例：**
+```
+Available configurations:
+* my-config: API Key: sk-************** (URL: https://api.anthropic.com, Model: claude-3)
+  openai-dev: API Key: sk-************** (URL: https://api.openai.com, Model: gpt-4o)
+  backup-config: API Key: sk-************** (URL: https://custom-api.example.com, Model: claude-3-sonnet-20240229)
+
+(* 表示当前活动配置)
+```
 ```
 
 ### 基本命令
@@ -401,6 +548,102 @@ apimgr ping -T -v            # 详细输出（显示请求/响应内容）
 - 只需要在 shell 配置中添加一行引用
 - 配置切换后，新终端或重新加载的 shell 会自动使用新配置
 - 无需重启终端，只需重新加载 shell 配置或打开新终端
+
+## 常见问题
+
+### 问：如何解决"连接超时"错误？
+
+**答：** 如果遇到连接超时错误，可能是服务器响应缓慢或负载过重。尝试增加超时参数：
+
+```bash
+apimgr ping -t 30s  # 设置超时时间为 30 秒
+```
+
+您可以根据网络情况调整超时值：
+- `-t 15s` 适用于中等缓慢的连接
+- `-t 30s` 适用于非常缓慢的连接或负载较高的服务器
+- `-t 60s` 适用于极慢或距离较远的服务器
+
+### 问：遇到"无法连接到服务器"错误应该怎么办？
+
+**答：** 此错误表示 API 服务器没有响应。请按照以下步骤排查：
+
+1. **验证服务器是否运行**: 检查 API 服务是否正常运行
+   ```bash
+   curl -I https://api.anthropic.com  # 测试服务器是否响应
+   ```
+
+2. **检查网络连接**: 确保你有互联网连接
+   ```bash
+   ping google.com  # 测试一般的互联网连接
+   ```
+
+3. **验证 URL 是否正确**: 确保使用的是正确的基础 URL
+   ```bash
+   apimgr status  # 查看当前配置
+   ```
+
+4. **检查防火墙设置**: 确保防火墙没有阻止出站 HTTPS 连接
+
+5. **尝试不同的网络**: 从其他网络连接以排除本地网络问题
+
+### 问：如何修复"域名解析失败"错误？
+
+**答：** DNS 解析错误表示系统无法将域名转换为 IP 地址。尝试以下解决方案：
+
+1. **验证域名拼写**: 仔细检查 URL 中是否有拼写错误
+   ```bash
+   apimgr list  # 查看保存的配置
+   ```
+
+2. **检查 DNS 设置**: 确保系统的 DNS 配置正确
+   ```bash
+   # 测试 DNS 解析
+   nslookup api.anthropic.com
+   # 或使用 dig
+   dig api.anthropic.com
+   ```
+
+3. **测试互联网连接**: 确保有网络访问
+   ```bash
+   ping 8.8.8.8  # 测试到 Google DNS 的连接
+   ```
+
+4. **尝试使用不同的 DNS 服务器**: 临时使用公共 DNS，如 Google (8.8.8.8) 或 Cloudflare (1.1.1.1)
+
+5. **检查域名是否存在**: 验证域名是否有效且处于活动状态
+   ```bash
+   whois api.anthropic.com
+   ```
+
+### 问：可以同时使用多个 API 提供商吗？
+
+**答：** 可以！apimgr 专为多提供商管理而设计。您可以：
+- 为不同提供商（Anthropic、OpenAI、自定义 API）添加配置
+- 全局或本地（仅当前 shell）切换它们
+- 在不同终端会话中使用不同配置
+
+示例：
+```bash
+apimgr add anthropic-prod --sk sk-ant-... --url https://api.anthropic.com
+apimgr add openai-dev --sk sk-... --url https://api.openai.com
+apimgr switch anthropic-prod  # 全局切换
+apimgr switch -l openai-dev   # 本地切换（仅当前 shell）
+```
+
+### 问：如何保护我的 API 密钥安全？
+
+**答：** apimgr 实施了多项安全措施：
+- 配置文件使用 0600 权限存储（仅所有者可读）
+- API 密钥在 list/status 输出中被掩码处理（例如：`sk-ant-api03-**************`）
+- 密钥存储在本地机器上，不会发送到外部服务
+- 环境变量仅在当前 shell 会话中设置
+
+最佳实践：
+1. 切勿将配置文件提交到版本控制系统
+2. 为开发和生产使用不同的 API 密钥
+3. 定期轮换您的 API 密钥
+4. 使用 `-l/--local` 参数进行临时测试，避免更改全局配置
 
 ## 安全特性
 
