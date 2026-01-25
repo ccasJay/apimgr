@@ -6,6 +6,22 @@
 
 [中文版](README.zh.md)
 
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Environment Variables](#environment-variables)
+- [Usage Examples](#usage-examples)
+- [Shell Integration](#shell-integration)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+
 ## Overview
 
 A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.
@@ -273,6 +289,50 @@ apimgr automatically respects and displays these environment variables:
 
 ## Usage Examples
 
+### Complete Workflow Example
+
+```bash
+# 1. First time setup
+apimgr enable
+
+# 2. Add your first configuration
+apimgr add prod-claude \
+  --sk sk-ant-api03-xxx... \
+  --url https://api.anthropic.com \
+  --model claude-3-opus-20240229
+
+# 3. Add a development configuration
+apimgr add dev-claude \
+  --sk sk-ant-api03-yyy... \
+  --url https://api.anthropic.com \
+  --model claude-3-sonnet-20240229
+
+# 4. List all configurations
+apimgr list
+# Output:
+# Available configurations:
+# * prod-claude: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-opus-20240229)
+#   dev-claude: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-sonnet-20240229)
+
+# 5. Switch to development configuration
+apimgr switch dev-claude
+
+# 6. Test connectivity
+apimgr ping
+# Output:
+# ✓ Successfully connected to https://api.anthropic.com
+# Status: 200 OK
+# Response time: 123ms
+
+# 7. Test API compatibility
+apimgr ping -T
+# Output:
+# Testing API compatibility...
+# ✓ API is compatible
+# Provider: anthropic
+# Model: claude-3-sonnet-20240229
+```
+
 ### Interactive Configuration
 ```bash
 $ apimgr add
@@ -317,25 +377,108 @@ Run `apimgr install` to enable shell integration for automatic configuration loa
 ## Troubleshooting
 
 ### Common Errors
-- **Timeout Error**: Increase timeout with `-t` flag (e.g., `apimgr ping -t 30s`)
-- **Connection Refused**: Check if API server is running and accessible
-- **DNS Resolution Failed**: Verify domain name and network connectivity
-- **Invalid URL**: Ensure URL includes protocol (http:// or https://)
 
-### Detailed Diagnostics
-Use `apimgr ping -j` for JSON output with full error details:
+#### Timeout Error
+**Symptom**: Connection times out when running `apimgr ping`
 
+**Solution**: 
+```bash
+# Increase timeout with -t flag
+apimgr ping -t 30s
+
+# Check your network connection
+curl -I https://api.anthropic.com
+```
+
+#### Connection Refused
+**Symptom**: "Connection refused" error
+
+**Solutions**:
+- Check if the API server is running and accessible
+- Verify the base URL is correct
+- Check firewall settings
+- Try accessing the URL in a browser or with curl
+
+#### DNS Resolution Failed
+**Symptom**: "No such host" or DNS resolution errors
+
+**Solutions**:
+- Verify domain name spelling
+- Check your DNS settings
+- Try using a different DNS server
+- Test with: `nslookup api.anthropic.com`
+
+#### Invalid URL
+**Symptom**: "Invalid URL" error when adding configuration
+
+**Solution**: Ensure URL includes protocol (http:// or https://)
+```bash
+# ✗ Wrong
+apimgr add config --url api.anthropic.com
+
+# ✓ Correct
+apimgr add config --url https://api.anthropic.com
+```
+
+#### Configuration Not Taking Effect
+**Symptom**: Environment variables not updated after switching
+
+**Solutions**:
+```bash
+# 1. Check if shell integration is configured
+grep apimgr ~/.zshrc  # or ~/.bashrc
+
+# 2. If not found, add it:
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
+
+# 3. Reload shell configuration
+source ~/.zshrc
+
+# 4. Verify environment variables
+echo $ANTHROPIC_API_KEY
+```
+
+#### Command Not Found
+**Symptom**: `apimgr: command not found`
+
+**Solutions**:
+```bash
+# Check if apimgr is in PATH
+which apimgr
+
+# If not found, add to PATH or move to system directory
+sudo cp apimgr /usr/local/bin/
+
+# Or add current directory to PATH temporarily
+export PATH=$PATH:$(pwd)
+```
+
+### Getting Help
+
+Use verbose flag for detailed output:
+```bash
+apimgr ping -v      # Verbose output with request/response details
+apimgr ping -j      # JSON output for parsing and automation
+apimgr ping -T -v   # Verbose compatibility test with full API details
+```
+
+**Example JSON output:**
 ```json
 {
-  "url": "https://api.example.com",
-  "statusCode": 0,
-  "statusText": "",
+  "url": "https://api.anthropic.com",
+  "statusCode": 200,
+  "statusText": "OK",
   "requestMethod": "HEAD",
-  "durationMs": 10001,
+  "durationMs": 123,
   "timeoutMs": 10000,
-  "success": false
+  "success": true
 }
 ```
+
+For more help:
+- Run `apimgr --help` or `apimgr <command> --help`
+- Check the [Quick Start Guide](QUICKSTART.md)
+- Open an [issue](https://github.com/ccasJay/apimgr/issues) on GitHub
 
 ## Documentation
 

@@ -2,7 +2,37 @@
 
 [English version](README.md)
 
-一个用 Go 语言开发的命令行工具，用于管理 API 配置（密钥、基础 URL、模型等）并测试连通性，支持多提供商切换。
+## 目录
+- [项目简介](#项目简介)
+- [特性](#-特性)
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [配置文件](#配置文件)
+- [命令详解](#命令详解)
+- [环境变量](#环境变量)
+- [使用示例](#使用示例)
+- [Shell 集成](#shell-集成)
+- [从旧版本迁移](#从旧版本迁移)
+- [故障排查](#故障排查)
+- [技术架构](#技术架构)
+- [文档](#文档)
+- [贡献](#贡献)
+- [许可证](#许可证)
+- [支持](#支持)
+
+## 项目简介
+
+一个现代化、功能丰富的命令行工具，用于管理 API 配置和测试连通性。apimgr 通过集中式配置管理、安全存储和无缝 shell 集成，简化了多 API 提供商的使用。
+
+**核心亮点：**
+- 🎨 **精美的 TUI**: 功能完整的终端用户界面，支持键盘快捷键
+- 🔄 **多提供商**: 支持 Anthropic、OpenAI 和自定义 API 提供商
+- 🔐 **安全**: 加密密钥存储和文件权限控制
+- 🚀 **快速**: 通过 shell 集成实现即时配置切换
+- 🧪 **测试**: 内置连通性和兼容性测试功能
+- 📦 **跨平台**: 原生支持 macOS、Linux 和 Windows
+
+> **注意**: 本项目目前专注于 Claude Code 集成，未来计划支持更多 AI 编码工具。
 
 ## ✨ 特性
 
@@ -462,30 +492,112 @@ apimgr enable
 
 ## 故障排查
 
-### 配置切换后没有生效
+### 常见错误
 
+#### 超时错误
+**症状**: 运行 `apimgr ping` 时连接超时
+
+**解决方案**: 
 ```bash
-# 检查 active.env 文件是否存在
-ls -la ~/.config/apimgr/active.env
+# 使用 -t 标志增加超时时间
+apimgr ping -t 30s
 
-# 确认 shell 集成已添加
-grep apimgr ~/.zshrc  # 或 ~/.bashrc
-
-# 重新加载 shell 配置
-source ~/.zshrc
+# 检查网络连接
+curl -I https://api.anthropic.com
 ```
 
-### 命令未找到
+#### 连接被拒绝
+**症状**: 出现 "Connection refused" 错误
 
+**解决方案**:
+- 检查 API 服务器是否运行且可访问
+- 验证 base URL 是否正确
+- 检查防火墙设置
+- 尝试在浏览器或使用 curl 访问 URL
+
+#### DNS 解析失败
+**症状**: 出现 "No such host" 或 DNS 解析错误
+
+**解决方案**:
+- 验证域名拼写
+- 检查 DNS 设置
+- 尝试使用不同的 DNS 服务器
+- 测试: `nslookup api.anthropic.com`
+
+#### URL 无效
+**症状**: 添加配置时出现 "Invalid URL" 错误
+
+**解决方案**: 确保 URL 包含协议 (http:// 或 https://)
+```bash
+# ✗ 错误
+apimgr add config --url api.anthropic.com
+
+# ✓ 正确
+apimgr add config --url https://api.anthropic.com
+```
+
+#### 配置切换后没有生效
+**症状**: 切换后环境变量未更新
+
+**解决方案**:
+```bash
+# 1. 检查 active.env 文件是否存在
+ls -la ~/.config/apimgr/active.env
+
+# 2. 确认 shell 集成已添加
+grep apimgr ~/.zshrc  # 或 ~/.bashrc
+
+# 3. 如果未找到，添加它：
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
+
+# 4. 重新加载 shell 配置
+source ~/.zshrc
+
+# 5. 验证环境变量
+echo $ANTHROPIC_API_KEY
+```
+
+#### 命令未找到
+**症状**: `apimgr: command not found`
+
+**解决方案**:
 ```bash
 # 确认 apimgr 在 PATH 中
 which apimgr
 
-# 如果未找到，添加到 PATH
-export PATH=$PATH:/usr/local/bin
-# 或将 apimgr 复制到 PATH 中的目录
+# 如果未找到，移动到系统目录
 sudo cp apimgr /usr/local/bin/
+
+# 或临时添加当前目录到 PATH
+export PATH=$PATH:$(pwd)
 ```
+
+### 获取帮助
+
+使用详细输出标志：
+```bash
+apimgr ping -v      # 详细输出，包含请求/响应详情
+apimgr ping -j      # JSON 格式输出，便于解析和自动化
+apimgr ping -T -v   # 详细的兼容性测试，包含完整 API 详情
+```
+
+**示例 JSON 输出：**
+```json
+{
+  "url": "https://api.anthropic.com",
+  "statusCode": 200,
+  "statusText": "OK",
+  "requestMethod": "HEAD",
+  "durationMs": 123,
+  "timeoutMs": 10000,
+  "success": true
+}
+```
+
+更多帮助：
+- 运行 `apimgr --help` 或 `apimgr <命令> --help`
+- 查看[快速开始指南](QUICKSTART.zh.md)
+- 在 GitHub 上[提交 issue](https://github.com/ccasJay/apimgr/issues)
 
 ### 配置文件问题
 
@@ -530,6 +642,24 @@ go test ./...
 go clean
 ```
 
+## 文档
+
+- [快速开始指南](QUICKSTART.zh.md) - 快速上手基本使用
+- [架构指南](ARCHITECTURE.md) - 技术架构和设计细节（英文）
+- [贡献指南](CONTRIBUTING.zh.md) - 如何为项目做贡献
+- [行为准则](CODE_OF_CONDUCT.zh.md) - 社区规范
+- [安全政策](SECURITY.md) - 安全实践和漏洞报告（英文）
+- [更新日志](CHANGELOG.md) - 版本历史和发布说明（英文）
+- [代码审核报告](CODE_AUDIT_REPORT.md) - 详细代码质量分析
+
+## 贡献
+
+欢迎贡献！请阅读[贡献指南](CONTRIBUTING.zh.md)了解开发流程和行为准则。
+
 ## 许可证
 
-MIT
+MIT - 详见 [LICENSE](LICENSE) 文件
+
+## 支持
+
+如有问题、功能请求或疑问，请在 GitHub 上[提交 issue](https://github.com/ccasJay/apimgr/issues)。
