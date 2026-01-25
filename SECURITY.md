@@ -18,8 +18,10 @@ We take the security of apimgr seriously. If you believe you have found a securi
 **Please do NOT report security vulnerabilities through public GitHub issues.**
 
 Instead, please report them via:
-- Email: [security contact needed - replace with actual email]
+- Email: [Please contact repository maintainers through GitHub]
 - GitHub Security Advisory: https://github.com/ccasJay/apimgr/security/advisories/new
+
+> **Note**: For now, please use GitHub Security Advisories for vulnerability reporting. A dedicated security email will be established in the future.
 
 ### What to Include
 
