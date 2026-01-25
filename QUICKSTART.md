@@ -4,34 +4,34 @@
 
 ## Installation
 
-### Method 1: Binary Download
-Download the appropriate binary for your system from [GitHub Releases](https://github.com/your-username/apimgr/releases).
+### Recommended: Binary Download
+Download the appropriate binary for your system from [GitHub Releases](https://github.com/ccasJay/apimgr/releases).
 
-### Method 2: Compile from Source
+### Alternative: Go Install
 ```bash
-git clone https://github.com/your-username/apimgr.git
-cd apimgr
-go build
-mv apimgr /usr/local/bin/
+go install github.com/ccasJay/apimgr@latest
 ```
 
-### Method 3: Go Install
+### Alternative: Compile from Source
 ```bash
-go install github.com/your-username/apimgr@latest
+git clone https://github.com/ccasJay/apimgr.git
+cd apimgr
+go build
+sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
 ```
 
 ## Initialization
 
-Run the init command to set up the application:
+**Note**: The `init` command has been replaced with `enable`. Run the enable command to set up the application:
 
 ```bash
-apimgr init
+apimgr enable
 ```
 
 This will guide you through:
 1. Configuration directory creation
-2. Default API provider selection
-3. Shell integration setup
+2. Shell integration setup
+3. Environment variable configuration
 
 ## Basic Usage
 
@@ -92,36 +92,55 @@ apimgr remove my-anthropic
 
 ### Bash
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.bashrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### Zsh
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.zshrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ### Fish
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.config/fish/config.fish
-```
-
-Reload the configuration:
-```bash
-source ~/.bashrc
+echo 'test -f ~/.config/apimgr/active.env; and source ~/.config/apimgr/active.env' >> ~/.config/fish/config.fish
+source ~/.config/fish/config.fish
 ```
 
 ## Advanced Features
 
-### Batch Operations
+### TUI Mode
+Launch the interactive Terminal UI for a visual interface:
 ```bash
-# Test all configurations in parallel
-apimgr ping --all
+apimgr  # Run without arguments
+```
+
+### Compatibility Testing
+```bash
+# Test API compatibility with real requests
+apimgr ping -T
+
+# Test streaming API support
+apimgr ping -T --stream
+
+# Verbose output
+apimgr ping -T -v
 ```
 
 ### JSON Output
 ```bash
 apimgr list --json
 apimgr ping --json
+```
+
+### Local vs Global Configuration
+```bash
+# Global switch (affects all shells)
+apimgr switch my-config
+
+# Local switch (current shell only)
+apimgr switch -l my-config
 ```
 
 ## Help

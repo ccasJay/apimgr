@@ -1,12 +1,40 @@
 # API Manager (apimgr)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/your-username/apimgr)
+[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/ccasJay/apimgr)
 [![Go Version](https://img.shields.io/badge/Go-1.21%2B-blue)](https://golang.org/)
 
 [中文版](README.zh.md)
 
-A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.(This project is only compatible with Claude Code for the time being, more tools like codex or gemini will be available in the future. )
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Environment Variables](#environment-variables)
+- [Usage Examples](#usage-examples)
+- [Shell Integration](#shell-integration)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+
+## Overview
+
+A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.
+
+**Key Highlights:**
+- 🎨 **Beautiful TUI**: Full-featured terminal user interface with keyboard shortcuts
+- 🔄 **Multi-Provider**: Support for Anthropic, OpenAI, and custom API providers  
+- 🔐 **Secure**: Encrypted key storage with file permission controls
+- 🚀 **Fast**: Instant configuration switching with shell integration
+- 🧪 **Testing**: Built-in connectivity and compatibility testing
+- 📦 **Cross-Platform**: Native support for macOS, Linux, and Windows
+
+> **Note**: This project currently focuses on Claude Code integration, with plans to support more AI coding tools in the future.
 
 
 
@@ -46,15 +74,17 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ## Installation
 
 ### Prerequisites
-- Go 1.21 or higher (for source compilation)
+- Go 1.21 or higher (for building from source)
 
-### Recommended Installation
-#### Go Install
+### Recommended: Binary Download
+Download pre-built binaries for your platform from the [latest release](https://github.com/ccasJay/apimgr/releases).
+
+### Alternative: Install with Go
 ```bash
-go install https://github.com/ccasJay/apimgr.git
+go install github.com/ccasJay/apimgr@latest
 ```
 
-#### From Source
+### Alternative: Build from Source
 ```bash
 git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
@@ -62,13 +92,12 @@ go build
 sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
 ```
 
-#### Using Makefile
+### Alternative: Using Makefile
 ```bash
 git clone https://github.com/ccasJay/apimgr.git
-
 cd apimgr
 make install  # Builds and installs locally
-# sudo make install  # For system-wide installation
+# For system-wide installation, run: sudo cp apimgr /usr/local/bin/
 ```
 
 ## Quick Start
@@ -260,6 +289,50 @@ apimgr automatically respects and displays these environment variables:
 
 ## Usage Examples
 
+### Complete Workflow Example
+
+```bash
+# 1. First time setup
+apimgr enable
+
+# 2. Add your first configuration
+apimgr add prod-claude \
+  --sk sk-ant-api03-xxx... \
+  --url https://api.anthropic.com \
+  --model claude-3-opus-20240229
+
+# 3. Add a development configuration
+apimgr add dev-claude \
+  --sk sk-ant-api03-yyy... \
+  --url https://api.anthropic.com \
+  --model claude-3-sonnet-20240229
+
+# 4. List all configurations
+apimgr list
+# Output:
+# Available configurations:
+# * prod-claude: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-opus-20240229)
+#   dev-claude: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-sonnet-20240229)
+
+# 5. Switch to development configuration
+apimgr switch dev-claude
+
+# 6. Test connectivity
+apimgr ping
+# Output:
+# ✓ Successfully connected to https://api.anthropic.com
+# Status: 200 OK
+# Response time: 123ms
+
+# 7. Test API compatibility
+apimgr ping -T
+# Output:
+# Testing API compatibility...
+# ✓ API is compatible
+# Provider: anthropic
+# Model: claude-3-sonnet-20240229
+```
+
 ### Interactive Configuration
 ```bash
 $ apimgr add
@@ -304,33 +377,118 @@ Run `apimgr install` to enable shell integration for automatic configuration loa
 ## Troubleshooting
 
 ### Common Errors
-- **Timeout Error**: Increase timeout with `-t` flag (e.g., `apimgr ping -t 30s`)
-- **Connection Refused**: Check if API server is running and accessible
-- **DNS Resolution Failed**: Verify domain name and network connectivity
-- **Invalid URL**: Ensure URL includes protocol (http:// or https://)
 
-### Detailed Diagnostics
-Use `apimgr ping -j` for JSON output with full error details:
+#### Timeout Error
+**Symptom**: Connection times out when running `apimgr ping`
 
+**Solution**: 
+```bash
+# Increase timeout with -t flag
+apimgr ping -t 30s
+
+# Check your network connection
+curl -I https://api.anthropic.com
+```
+
+#### Connection Refused
+**Symptom**: "Connection refused" error
+
+**Solutions**:
+- Check if the API server is running and accessible
+- Verify the base URL is correct
+- Check firewall settings
+- Try accessing the URL in a browser or with curl
+
+#### DNS Resolution Failed
+**Symptom**: "No such host" or DNS resolution errors
+
+**Solutions**:
+- Verify domain name spelling
+- Check your DNS settings
+- Try using a different DNS server
+- Test with: `nslookup api.anthropic.com`
+
+#### Invalid URL
+**Symptom**: "Invalid URL" error when adding configuration
+
+**Solution**: Ensure URL includes protocol (http:// or https://)
+```bash
+# ✗ Wrong
+apimgr add config --url api.anthropic.com
+
+# ✓ Correct
+apimgr add config --url https://api.anthropic.com
+```
+
+#### Configuration Not Taking Effect
+**Symptom**: Environment variables not updated after switching
+
+**Solutions**:
+```bash
+# 1. Check if shell integration is configured
+grep apimgr ~/.zshrc  # or ~/.bashrc
+
+# 2. If not found, add it:
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
+
+# 3. Reload shell configuration
+source ~/.zshrc
+
+# 4. Verify environment variables
+echo $ANTHROPIC_API_KEY
+```
+
+#### Command Not Found
+**Symptom**: `apimgr: command not found`
+
+**Solutions**:
+```bash
+# Check if apimgr is in PATH
+which apimgr
+
+# If not found, add to PATH or move to system directory
+sudo cp apimgr /usr/local/bin/
+
+# Or add current directory to PATH temporarily
+export PATH=$PATH:$(pwd)
+```
+
+### Getting Help
+
+Use verbose flag for detailed output:
+```bash
+apimgr ping -v      # Verbose output with request/response details
+apimgr ping -j      # JSON output for parsing and automation
+apimgr ping -T -v   # Verbose compatibility test with full API details
+```
+
+**Example JSON output:**
 ```json
 {
-  "url": "https://api.example.com",
-  "statusCode": 0,
-  "statusText": "",
+  "url": "https://api.anthropic.com",
+  "statusCode": 200,
+  "statusText": "OK",
   "requestMethod": "HEAD",
-  "durationMs": 10001,
+  "durationMs": 123,
   "timeoutMs": 10000,
-  "success": false
+  "success": true
 }
 ```
 
+For more help:
+- Run `apimgr --help` or `apimgr <command> --help`
+- Check the [Quick Start Guide](QUICKSTART.md)
+- Open an [issue](https://github.com/ccasJay/apimgr/issues) on GitHub
+
 ## Documentation
 
-- [Quick Start Guide](QUICKSTART.md)
-- [Command Reference](COMMANDS.md) (TODO)
-- [Contribution Guide](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security Policy](SECURITY.md) (TODO)
+- [Quick Start Guide](QUICKSTART.md) - Get started quickly with basic usage
+- [Architecture Guide](ARCHITECTURE.md) - Technical architecture and design details
+- [Contribution Guide](CONTRIBUTING.md) - How to contribute to the project
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community guidelines
+- [Security Policy](SECURITY.md) - Security practices and vulnerability reporting
+- [Changelog](CHANGELOG.md) - Version history and release notes
+- [Code Audit Report](CODE_AUDIT_REPORT.md) - Detailed code quality analysis
 
 ## Contributing
 
@@ -342,4 +500,4 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
-For issues, feature requests, or questions, please open an [issue](https://github.com/your-username/apimgr/issues) on GitHub.
+For issues, feature requests, or questions, please open an [issue](https://github.com/ccasJay/apimgr/issues) on GitHub.

@@ -4,34 +4,34 @@
 
 ## 安装
 
-### 方法1：二进制下载
-从 [GitHub Releases](https://github.com/your-username/apimgr/releases) 下载适合您系统的二进制文件。
+### 方法1：二进制下载（推荐）
+从 [GitHub Releases](https://github.com/ccasJay/apimgr/releases) 下载适合您系统的二进制文件。
 
-### 方法2：源码编译
+### 方法2：Go install
 ```bash
-git clone https://github.com/your-username/apimgr.git
-cd apimgr
-go build
-mv apimgr /usr/local/bin/
+go install github.com/ccasJay/apimgr@latest
 ```
 
-### 方法3：Go install
+### 方法3：源码编译
 ```bash
-go install github.com/your-username/apimgr@latest
+git clone https://github.com/ccasJay/apimgr.git
+cd apimgr
+go build
+sudo mv apimgr /usr/local/bin/  # 可选：安装到系统路径
 ```
 
 ## 初始化
 
-首次使用时，运行初始化命令：
+**注意**: `init` 命令已被 `enable` 替代。首次使用时，运行初始化命令：
 
 ```bash
-apimgr init
+apimgr enable
 ```
 
 这会引导您完成：
 1. 配置目录创建
-2. 默认API提供商选择
-3. Shell集成配置
+2. Shell 集成配置
+3. 环境变量设置
 
 ## 基本使用
 
@@ -100,25 +100,41 @@ apimgr remove my-anthropic
 
 ### Bash
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.bashrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### Zsh
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.zshrc
+echo '[[ -f ~/.config/apimgr/active.env ]] && source ~/.config/apimgr/active.env' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ### Fish
 ```bash
-echo 'source ~/.config/apimgr/active.env' >> ~/.config/fish/config.fish
-```
-
-重新加载配置：
-```bash
-source ~/.bashrc  # 或对应Shell的配置文件
+echo 'test -f ~/.config/apimgr/active.env; and source ~/.config/apimgr/active.env' >> ~/.config/fish/config.fish
+source ~/.config/fish/config.fish
 ```
 
 ## 高级功能
+
+### TUI 模式
+启动交互式终端界面：
+```bash
+apimgr  # 不带任何参数运行
+```
+
+### 兼容性测试
+```bash
+# 使用真实请求测试 API 兼容性
+apimgr ping -T
+
+# 测试流式 API 支持
+apimgr ping -T --stream
+
+# 详细输出
+apimgr ping -T -v
+```
 
 ### 配置同步
 
@@ -128,6 +144,15 @@ apimgr sync env
 
 # 同步到特定工具
 apimgr sync tool-name
+```
+
+### 本地 vs 全局配置
+```bash
+# 全局切换（影响所有 shell）
+apimgr switch my-config
+
+# 本地切换（仅当前 shell）
+apimgr switch -l my-config
 ```
 
 ### 批量操作
