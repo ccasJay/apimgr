@@ -98,7 +98,7 @@
 ### 环境要求
 - **Go 1.21+**: 从源码构建时需要
 - **操作系统**: 支持以下系统之一：
-  - macOS (Intel/Apple Silicon)
+  - macOS (x86_64/ARM64)
   - Linux (x86_64/ARM64)
   - Windows (x86_64)
 
@@ -247,7 +247,7 @@ apimgr list
 **输出示例：**
 ```
 Available configurations:
-* my-config: API Key: sk-x****xx (URL: https://api.anthropic.com, Model: claude-3)
+* my-config: API Key: sk-************** (URL: https://api.anthropic.com, Model: claude-3)
   openai-dev: API Key: sk-************** (URL: https://api.openai.com, Model: gpt-4o)
   backup-config: API Key: sk-************** (URL: https://custom-api.example.com, Model: claude-3-sonnet-20240229)
 

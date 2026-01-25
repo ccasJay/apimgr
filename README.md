@@ -119,7 +119,7 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ### Prerequisites
 - **Go 1.21+**: Required for building from source
 - **Operating System**: One of the following:
-  - macOS (Intel/Apple Silicon)
+  - macOS (x86_64/ARM64)
   - Linux (x86_64/ARM64)
   - Windows (x86_64)
 
@@ -133,7 +133,7 @@ apimgr is tested and supported on:
 ### Installation Methods
 #### Go Install
 ```bash
-go install https://github.com/ccasJay/apimgr.git
+go install github.com/ccasJay/apimgr@latest
 ```
 
 #### From Source
@@ -219,7 +219,7 @@ TUI Keyboard Shortcuts:
    * my-config: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-opus-20240229)
      openai-dev: API Key: sk-************** (URL: https://api.openai.com, Model: gpt-4o)
      backup-config: API Key: sk-************** (URL: https://custom-api.example.com, Model: claude-3-sonnet-20240229)
-   
+
    (* indicates currently active configuration)
    ```
 
