@@ -8,6 +8,36 @@
 
 A modern, feature-rich command-line tool for managing API configurations and testing connectivity. apimgr simplifies working with multiple API providers by centralizing configuration management with secure storage and seamless shell integration.(This project is only compatible with Claude Code for the time being, more tools like codex or gemini will be available in the future. )
 
+## Table of Contents
+
+- [Features](#features)
+  - [Core Features](#core-features)
+  - [Advanced Features](#advanced-features)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Supported Operating Systems](#supported-operating-systems)
+  - [Installation Methods](#installation-methods)
+- [Quick Start](#quick-start)
+  - [TUI Mode (Recommended)](#tui-mode-recommended)
+  - [CLI Mode](#cli-mode)
+- [Configuration](#configuration)
+  - [Configuration Paths](#configuration-paths)
+  - [Configuration Format](#configuration-format)
+  - [Provider Auto-Detection](#provider-auto-detection)
+- [Commands](#commands)
+  - [TUI Mode](#tui-mode)
+  - [Basic Commands](#basic-commands)
+  - [Command Details](#command-details)
+- [Environment Variables](#environment-variables)
+- [Usage Examples](#usage-examples)
+- [Shell Integration](#shell-integration)
+- [FAQ](#faq)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+
 
 
 
@@ -24,6 +54,28 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ## Features
 
 ### Core Features
+
+```
+┌─────────────┐        ┌──────────────────┐        ┌─────────────────┐
+│   User      │───────▶│  apimgr CLI/TUI  │───────▶│  Config Storage │
+│  Commands   │        │                  │        │   (JSON file)   │
+└─────────────┘        └──────────────────┘        └─────────────────┘
+                              │      │
+                              │      │
+                              ▼      ▼
+                       ┌──────────────────┐
+                       │  Environment     │
+                       │  Variables       │
+                       │  (active.env)    │
+                       └──────────────────┘
+                              │
+                              ▼
+                       ┌──────────────────┐
+                       │  Claude Code &   │
+                       │  Other Tools     │
+                       └──────────────────┘
+```
+
 - **Multi-Provider Support**: Manage configurations for Anthropic, OpenAI, Doubao, and custom API providers
 - **Connectivity Testing**: Validate API endpoints with customizable requests and detailed error diagnostics
 - **Easy Configuration Switching**: Seamlessly switch between different API configurations globally or locally
@@ -33,6 +85,25 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 - **Cross-Platform**: Native support for macOS, Linux, and Windows
 
 ### Advanced Features
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      Configuration Modes                      │
+├──────────────────────────┬───────────────────────────────────┤
+│   Global Mode            │      Local Mode (-l flag)         │
+│   ┌───────────────┐      │      ┌───────────────┐           │
+│   │ config.json   │──────┼─────▶│  Shell ENV    │           │
+│   │ (persistent)  │      │      │  (temporary)  │           │
+│   └───────────────┘      │      └───────────────┘           │
+│          │               │             │                     │
+│          ▼               │             ▼                     │
+│   ┌───────────────┐      │      ┌───────────────┐           │
+│   │  active.env   │      │      │ Current Shell │           │
+│   │  (all shells) │      │      │    Only       │           │
+│   └───────────────┘      │      └───────────────┘           │
+└──────────────────────────┴───────────────────────────────────┘
+```
+
 - **Interactive TUI**: Full-featured terminal user interface with keyboard navigation (just run `apimgr` without arguments)
 - **Interactive Editing**: Intuitive interactive commands for adding and modifying configurations
 - **Dual Configuration Modes**:
@@ -46,9 +117,20 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ## Installation
 
 ### Prerequisites
-- Go 1.21 or higher (for source compilation)
+- **Go 1.21+**: Required for building from source
+- **Operating System**: One of the following:
+  - macOS (Intel/Apple Silicon)
+  - Linux (x86_64/ARM64)
+  - Windows (x86_64)
 
-### Recommended Installation
+### Supported Operating Systems
+
+apimgr is tested and supported on:
+- **macOS**: 10.15 (Catalina) or later
+- **Linux**: Ubuntu 20.04+, Debian 10+, Fedora 33+, Arch Linux, and other modern distributions
+- **Windows**: Windows 10 or later (use PowerShell or WSL2 for best experience)
+
+### Installation Methods
 #### Go Install
 ```bash
 go install https://github.com/ccasJay/apimgr.git
@@ -104,14 +186,41 @@ TUI Keyboard Shortcuts:
    ```bash
    apimgr add my-config --sk sk-ant-api03-... --url https://api.anthropic.com
    ```
+   
+   **Output:**
+   ```
+   ✅ Configuration 'my-config' added successfully
+   ✅ Configuration updated - active.env regenerated
+   ```
+   
    or just use
    ```bash
    apimgr add
+   ```
+   
+   **Interactive Output:**
+   ```
+   Enter config alias: my-config
+   Enter API key: sk-ant-api03-...
+   Enter Authentication Token (press Enter to skip):
+   Enter Base URL (default: https://api.anthropic.com):
+   Enter Model name (press Enter to skip): claude-3-opus-20240229
+   ✅ Configuration 'my-config' added successfully
    ```
 
 2. **List all configurations**
    ```bash
    apimgr list
+   ```
+   
+   **Output:**
+   ```
+   Available configurations:
+   * my-config: API Key: sk-ant-api03-************** (URL: https://api.anthropic.com, Model: claude-3-opus-20240229)
+     openai-dev: API Key: sk-************** (URL: https://api.openai.com, Model: gpt-4o)
+     backup-config: API Key: sk-************** (URL: https://custom-api.example.com, Model: claude-3-sonnet-20240229)
+   
+   (* indicates currently active configuration)
    ```
 
 3. **Switch to a configuration**
@@ -125,6 +234,41 @@ TUI Keyboard Shortcuts:
    apimgr ping  # Test active configuration
    apimgr ping -u https://api.example.com  # Test custom URL
    apimgr ping -T -p /chat/completions  # Test real API endpoint with POST request
+   ```
+   
+   **Success Output:**
+   ```
+   Testing connection to: https://api.anthropic.com
+   ✅ Connection successful!
+   Status: 200 OK
+   Response Time: 245ms
+   ```
+   
+   **Failure Output (Connection Timeout):**
+   ```
+   Testing connection to: https://slow-api.example.com
+   ❌ Connection failed!
+   Error: Request timeout after 10000ms
+   
+   💡 Tip: Try increasing timeout with -t flag (e.g., apimgr ping -t 30s)
+   ```
+   
+   **Failure Output (Server Unreachable):**
+   ```
+   Testing connection to: https://api.down-server.com
+   ❌ Connection failed!
+   Error: Connection refused - server is not responding
+   
+   💡 Tip: Check if the server is running and accessible
+   ```
+   
+   **Failure Output (DNS Resolution Failed):**
+   ```
+   Testing connection to: https://invalid-domain.example
+   ❌ Connection failed!
+   Error: DNS resolution failed - no such host
+   
+   💡 Tip: Check your network connection and verify the domain name spelling
    ```
 
 5. **Check current status**
@@ -300,6 +444,102 @@ Run `apimgr install` to enable shell integration for automatic configuration loa
 - Bash
 - Zsh
 - Fish
+
+## FAQ
+
+### Q: How do I resolve "Connection Timeout" errors?
+
+**A:** If you're experiencing connection timeout errors, the server might be slow to respond or under heavy load. Try increasing the timeout parameter:
+
+```bash
+apimgr ping -t 30s  # Set timeout to 30 seconds
+```
+
+You can adjust the timeout value based on your network conditions:
+- `-t 15s` for moderately slow connections
+- `-t 30s` for very slow connections or servers under load
+- `-t 60s` for extremely slow or distant servers
+
+### Q: What should I do when I see "Cannot connect to server" errors?
+
+**A:** This error occurs when the API server is not responding. Follow these troubleshooting steps:
+
+1. **Verify the server is running**: Check if the API service is operational
+   ```bash
+   curl -I https://api.anthropic.com  # Test if server responds
+   ```
+
+2. **Check your network connection**: Ensure you have internet connectivity
+   ```bash
+   ping google.com  # Test general internet connectivity
+   ```
+
+3. **Verify the URL is correct**: Make sure you're using the correct base URL
+   ```bash
+   apimgr status  # Review your current configuration
+   ```
+
+4. **Check firewall settings**: Ensure your firewall isn't blocking outbound HTTPS connections
+
+5. **Test with a different network**: Try connecting from a different network to rule out local network issues
+
+### Q: How do I fix "Domain name resolution failure" errors?
+
+**A:** DNS resolution errors indicate that your system cannot translate the domain name to an IP address. Try these solutions:
+
+1. **Verify the domain name spelling**: Double-check for typos in the URL
+   ```bash
+   apimgr list  # Review your saved configurations
+   ```
+
+2. **Check your DNS settings**: Ensure your system's DNS is configured correctly
+   ```bash
+   # Test DNS resolution
+   nslookup api.anthropic.com
+   # Or use dig
+   dig api.anthropic.com
+   ```
+
+3. **Test your internet connection**: Make sure you have network access
+   ```bash
+   ping 8.8.8.8  # Test connection to Google's DNS
+   ```
+
+4. **Try using a different DNS server**: Temporarily use public DNS like Google (8.8.8.8) or Cloudflare (1.1.1.1)
+
+5. **Check if the domain exists**: Verify the domain is valid and active
+   ```bash
+   whois api.anthropic.com
+   ```
+
+### Q: Can I use apimgr with multiple API providers simultaneously?
+
+**A:** Yes! apimgr is designed for multi-provider management. You can:
+- Add configurations for different providers (Anthropic, OpenAI, custom APIs)
+- Switch between them globally or locally (current shell only)
+- Use different configurations in different terminal sessions
+
+Example:
+```bash
+apimgr add anthropic-prod --sk sk-ant-... --url https://api.anthropic.com
+apimgr add openai-dev --sk sk-... --url https://api.openai.com
+apimgr switch anthropic-prod  # Global switch
+apimgr switch -l openai-dev   # Local switch (current shell only)
+```
+
+### Q: How do I keep my API keys secure?
+
+**A:** apimgr implements several security measures:
+- Configuration files are stored with 0600 permissions (readable only by owner)
+- API keys are masked in list/status output (e.g., `sk-ant-api03-**************`)
+- Keys are stored locally on your machine, never sent to external services
+- Environment variables are only set in your current shell session
+
+Best practices:
+1. Never commit configuration files to version control
+2. Use different API keys for development and production
+3. Regularly rotate your API keys
+4. Use the `-l/--local` flag for temporary testing to avoid changing global config
 
 ## Troubleshooting
 
