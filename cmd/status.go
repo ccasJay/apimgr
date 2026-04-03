@@ -7,6 +7,7 @@ import (
 
 	"apimgr/config"
 	"apimgr/internal/utils"
+
 	"github.com/spf13/cobra"
 )
 
@@ -97,7 +98,7 @@ var statusCmd = &cobra.Command{
 			}
 		} else {
 			if globalErr != nil {
-				fmt.Println("💡 No configuration set")
+				fmt.Println("💡 No active configuration set (apimgr is disabled)")
 			} else {
 				fmt.Println("💡 Currently using global configuration (Shell has no environment variables set)")
 			}

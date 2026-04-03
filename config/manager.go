@@ -661,8 +661,8 @@ func (cm *Manager) syncClaudeSettings(cfg *models.APIConfig) error {
 	// Create synchronization options
 	opts := syncpkg.SyncOptions{
 		DryRun:        false,
-		CreateBackup:  true,  // Create backup before update to ensure data safety
-		PreserveOther: true,  // Preserve non-ANTHROPIC environment variables
+		CreateBackup:  true, // Create backup before update to ensure data safety
+		PreserveOther: true, // Preserve non-ANTHROPIC environment variables
 	}
 
 	// Perform surgical update using sjson
@@ -754,4 +754,31 @@ func (cm *Manager) clearGlobalClaudeSettings() error {
 	}
 
 	return nil
+}
+
+// Disable clears the active configuration and syncs with Claude Code
+func (cm *Manager) Disable() error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	configFile, err := cm.loadConfigFile()
+	if err != nil {
+		return err
+	}
+
+	// 1. Clear active alias
+	configFile.Active = ""
+
+	// 2. Save configuration
+	if err := cm.saveConfigFile(configFile); err != nil {
+		return err
+	}
+
+	// 3. Generate active.env (which will remove the file since Active is empty)
+	if err := cm.generateActiveScript(); err != nil {
+		return err
+	}
+
+	// 4. Clear Claude Code settings
+	return cm.clearClaudeSettings()
 }
