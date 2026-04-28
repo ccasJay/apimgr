@@ -50,8 +50,8 @@ type CheckResult struct {
 // ValidationResult represents the result of response validation
 type ValidationResult struct {
 	Valid            bool     `json:"valid"`
-	HasChoices       bool     `json:"hasChoices"`       // OpenAI format
-	HasContent       bool     `json:"hasContent"`       // Anthropic format
+	HasChoices       bool     `json:"hasChoices"` // OpenAI format
+	HasContent       bool     `json:"hasContent"` // Anthropic format
 	HasModel         bool     `json:"hasModel"`
 	HasUsage         bool     `json:"hasUsage"`
 	MissingFields    []string `json:"missingFields,omitempty"`

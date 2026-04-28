@@ -1,5 +1,7 @@
 # 编译后的可执行文件
 apimgr
+apimgr_debug
+apimgr_test
 
 # 其他常见的忽略项
 *.exe
@@ -28,6 +30,9 @@ vendor/
 
 # Go workspace file
 go.work
+
+# Local worktrees
+worktrees/
 
 # IDE 目录
 .vscode/

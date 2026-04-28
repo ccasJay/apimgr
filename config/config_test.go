@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"apimgr/config/models"
@@ -94,12 +96,16 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
-
 // setupTestConfig creates a test config manager with a temporary directory
 func setupTestConfig(t *testing.T) *Manager {
 	t.Helper()
 	t.Setenv("APIMGR_ACTIVE", "") // Ensure clean environment
 	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("Failed to create fake home: %v", err)
+	}
+	t.Setenv("HOME", homeDir)
 	configPath := filepath.Join(tempDir, "config.json")
 	return &Manager{configPath: configPath}
 }
@@ -310,6 +316,41 @@ func TestGenerateActiveScript(t *testing.T) {
 		}
 	})
 
+	t.Run("shell quotes generated values", func(t *testing.T) {
+		cm := setupTestConfig(t)
+		if err := cm.Add(models.APIConfig{
+			Alias:  "alias'$(touch /tmp/pwned)",
+			APIKey: "sk'$(touch /tmp/pwned)",
+			Model:  "`touch /tmp/pwned`",
+		}); err != nil {
+			t.Fatalf("Add() error: %v", err)
+		}
+		if err := cm.SetActive("alias'$(touch /tmp/pwned)"); err != nil {
+			t.Fatalf("SetActive() error: %v", err)
+		}
+
+		if err := cm.GenerateActiveScript(); err != nil {
+			t.Fatalf("GenerateActiveScript() error: %v", err)
+		}
+
+		activeEnvPath := filepath.Join(filepath.Dir(cm.configPath), "active.env")
+		data, err := os.ReadFile(activeEnvPath)
+		if err != nil {
+			t.Fatalf("Failed to read active.env: %v", err)
+		}
+
+		content := string(data)
+		if contains(content, `export ANTHROPIC_API_KEY="`) {
+			t.Fatal("active.env should not use double-quoted exports")
+		}
+		if !contains(content, `export ANTHROPIC_API_KEY='sk'"'"'$(touch /tmp/pwned)'`) {
+			t.Fatalf("active.env did not shell quote API key safely:\n%s", content)
+		}
+		if !contains(content, "export ANTHROPIC_MODEL='`touch /tmp/pwned`'") {
+			t.Fatalf("active.env did not shell quote model safely:\n%s", content)
+		}
+	})
+
 	t.Run("cleans up active.env when no active config", func(t *testing.T) {
 		cm := setupTestConfig(t)
 
@@ -327,6 +368,64 @@ func TestGenerateActiveScript(t *testing.T) {
 			t.Error("active.env should be removed when no active config")
 		}
 	})
+}
+
+func TestConcurrentManagersDoNotLoseAdds(t *testing.T) {
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("Failed to create fake home: %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	const workerCount = 24
+
+	start := make(chan struct{})
+	errs := make(chan error, workerCount)
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			cm := &Manager{configPath: configPath}
+			errs <- cm.Add(models.APIConfig{
+				Alias:  fmt.Sprintf("cfg-%02d", i),
+				APIKey: fmt.Sprintf("sk-%02d", i),
+			})
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Add() error: %v", err)
+		}
+	}
+
+	cm := &Manager{configPath: configPath}
+	configs, err := cm.List()
+	if err != nil {
+		t.Fatalf("List() error: %v", err)
+	}
+	if len(configs) != workerCount {
+		t.Fatalf("config count = %d, want %d: %#v", len(configs), workerCount, configs)
+	}
+
+	seen := make(map[string]bool)
+	for _, cfg := range configs {
+		seen[cfg.Alias] = true
+	}
+	for i := 0; i < workerCount; i++ {
+		alias := fmt.Sprintf("cfg-%02d", i)
+		if !seen[alias] {
+			t.Fatalf("missing config %s in %#v", alias, configs)
+		}
+	}
 }
 
 // TestUpdatePartial tests partial configuration updates

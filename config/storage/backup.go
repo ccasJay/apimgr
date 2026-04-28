@@ -167,6 +167,9 @@ func copyFile(src, dst string) error {
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
 		return err
 	}
+	if err := dstFile.Sync(); err != nil {
+		return err
+	}
 
 	// Preserve permissions from source file
 	srcInfo, err := os.Stat(src)

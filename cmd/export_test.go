@@ -31,7 +31,7 @@ func TestWrapString(t *testing.T) {
 			expected: "0123456789",
 		},
 		{
-			name:         "long string",
+			name:     "long string",
 			input:    "012345678901234567890",
 			width:    10,
 			expected: "0123456789\n0123456789\n0",
@@ -55,12 +55,12 @@ func TestWrapString(t *testing.T) {
 func TestExportSingleConfig(t *testing.T) {
 	// Create a test config
 	testCfg := models.APIConfig{
-		Alias:     "test-export",
-		Provider:  "anthropic",
-		APIKey:    "sk-test-key",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus", "claude-3-sonnet"},
+		Alias:    "test-export",
+		Provider: "anthropic",
+		APIKey:   "sk-test-key",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus", "claude-3-sonnet"},
 	}
 
 	// Test encryption logic
@@ -224,8 +224,8 @@ func TestExportWithAuthToken(t *testing.T) {
 		crypto.NewExportConfig(
 			"auth-token-config",
 			"anthropic",
-			"",                     // No API key
-			"my-auth-token",       // Using auth token instead
+			"",              // No API key
+			"my-auth-token", // Using auth token instead
 			"https://api.anthropic.com",
 			"claude-3-opus",
 			[]string{"claude-3-opus"},
@@ -271,12 +271,12 @@ func TestExportIntegration(t *testing.T) {
 
 	// Add test config
 	testCfg := models.APIConfig{
-		Alias:     "integration-test",
-		Provider:  "anthropic",
-		APIKey:    "sk-integration-test",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus"},
+		Alias:    "integration-test",
+		Provider: "anthropic",
+		APIKey:   "sk-integration-test",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus"},
 	}
 	err := cm.Add(testCfg)
 	require.NoError(t, err)

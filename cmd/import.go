@@ -315,7 +315,7 @@ func importConfigs(
 			}
 			// Default: skip
 			skipped++
-		continue
+			continue
 		}
 
 		// New configuration

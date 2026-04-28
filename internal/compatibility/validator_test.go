@@ -76,7 +76,6 @@ func TestProperty2_ResponseValidationWithErrorReporting(t *testing.T) {
 		positiveIntGen,    // outputTokens
 	))
 
-
 	// Property: Anthropic responses missing content are identified as invalid with correct error
 	properties.Property("anthropic response missing content reports missing field", prop.ForAll(
 		func(id string, model string, inputTokens int, outputTokens int) bool {
@@ -184,7 +183,6 @@ func TestProperty2_ResponseValidationWithErrorReporting(t *testing.T) {
 		positiveIntGen,    // outputTokens
 	))
 
-
 	// Property: Valid OpenAI responses are correctly identified as valid
 	properties.Property("valid openai response is identified as valid", prop.ForAll(
 		func(id string, model string, content string, promptTokens int, completionTokens int) bool {
@@ -279,7 +277,6 @@ func TestProperty2_ResponseValidationWithErrorReporting(t *testing.T) {
 		positiveIntGen,    // promptTokens
 		positiveIntGen,    // completionTokens
 	))
-
 
 	// Property: OpenAI responses missing message.content are identified as invalid with correct error
 	properties.Property("openai response missing message content reports missing field", prop.ForAll(

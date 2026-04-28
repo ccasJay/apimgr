@@ -379,6 +379,175 @@ func TestPropertySyncClaudeSettingsOnly(t *testing.T) {
 	}
 }
 
+func TestSyncClaudeSettingsOnlySyncsGlobalAndProjectSettings(t *testing.T) {
+	tempDir := t.TempDir()
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
+	projectDir := filepath.Join(tempDir, "project")
+	projectClaudeDir := filepath.Join(projectDir, ".claude")
+	if err := os.MkdirAll(projectClaudeDir, 0755); err != nil {
+		t.Fatalf("Failed to create project Claude dir: %v", err)
+	}
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	globalSettingsPath := filepath.Join(fakeHome, ".claude", "settings.json")
+	projectSettingsPath := filepath.Join(projectClaudeDir, "settings.json")
+	for path, keepVar := range map[string]string{
+		globalSettingsPath:  "GLOBAL_KEEP",
+		projectSettingsPath: "PROJECT_KEEP",
+	} {
+		settings := map[string]interface{}{
+			"env": map[string]interface{}{
+				keepVar:             "keep-this",
+				"ANTHROPIC_API_KEY": "old-key",
+			},
+		}
+		data, _ := json.MarshalIndent(settings, "", "  ")
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatalf("WriteFile(%s) error: %v", path, err)
+		}
+	}
+
+	cm := &Manager{configPath: filepath.Join(tempDir, "config.json")}
+	cfg := &models.APIConfig{
+		Alias:   "test",
+		APIKey:  "sk-new",
+		BaseURL: "https://api.example.com",
+		Model:   "claude-3",
+	}
+	if err := cm.SyncClaudeSettingsOnly(cfg); err != nil {
+		t.Fatalf("SyncClaudeSettingsOnly() error: %v", err)
+	}
+
+	for path, keepVar := range map[string]string{
+		globalSettingsPath:  "GLOBAL_KEEP",
+		projectSettingsPath: "PROJECT_KEEP",
+	} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) error: %v", path, err)
+		}
+		var settings map[string]interface{}
+		if err := json.Unmarshal(data, &settings); err != nil {
+			t.Fatalf("Unmarshal(%s) error: %v", path, err)
+		}
+		env := settings["env"].(map[string]interface{})
+		if env["ANTHROPIC_API_KEY"] != "sk-new" {
+			t.Fatalf("%s ANTHROPIC_API_KEY = %v, want sk-new", path, env["ANTHROPIC_API_KEY"])
+		}
+		if env[keepVar] != "keep-this" {
+			t.Fatalf("%s did not preserve %s", path, keepVar)
+		}
+	}
+}
+
+func TestClearClaudeSettingsHandlesNonObjectEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	claudeSettingsPath := filepath.Join(fakeHome, ".claude", "settings.json")
+	if err := os.WriteFile(claudeSettingsPath, []byte(`{"env":"not-an-object","other":true}`), 0600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	cm := &Manager{configPath: filepath.Join(tempDir, "config.json")}
+	if err := cm.clearClaudeSettings(); err != nil {
+		t.Fatalf("clearClaudeSettings() error: %v", err)
+	}
+
+	data, err := os.ReadFile(claudeSettingsPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("Unmarshal() error: %v", err)
+	}
+	if settings["env"] != "not-an-object" {
+		t.Fatalf("env = %v, want original non-object value", settings["env"])
+	}
+}
+
+func TestClearClaudeSettingsClearsGlobalAndProjectSettings(t *testing.T) {
+	tempDir := t.TempDir()
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
+	projectDir := filepath.Join(tempDir, "project")
+	projectClaudeDir := filepath.Join(projectDir, ".claude")
+	if err := os.MkdirAll(projectClaudeDir, 0755); err != nil {
+		t.Fatalf("Failed to create project Claude dir: %v", err)
+	}
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	globalSettingsPath := filepath.Join(fakeHome, ".claude", "settings.json")
+	projectSettingsPath := filepath.Join(projectClaudeDir, "settings.json")
+	for _, path := range []string{globalSettingsPath, projectSettingsPath} {
+		settings := map[string]interface{}{
+			"env": map[string]interface{}{
+				"ANTHROPIC_API_KEY":    "old-key",
+				"ANTHROPIC_AUTH_TOKEN": "old-token",
+				"ANTHROPIC_BASE_URL":   "https://old.example.com",
+				"ANTHROPIC_MODEL":      "old-model",
+				"OTHER_VAR":            "keep-this",
+			},
+		}
+		data, _ := json.MarshalIndent(settings, "", "  ")
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatalf("WriteFile(%s) error: %v", path, err)
+		}
+	}
+
+	cm := &Manager{configPath: filepath.Join(tempDir, "config.json")}
+	if err := cm.clearClaudeSettings(); err != nil {
+		t.Fatalf("clearClaudeSettings() error: %v", err)
+	}
+
+	for _, path := range []string{globalSettingsPath, projectSettingsPath} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) error: %v", path, err)
+		}
+		var settings map[string]interface{}
+		if err := json.Unmarshal(data, &settings); err != nil {
+			t.Fatalf("Unmarshal(%s) error: %v", path, err)
+		}
+		env := settings["env"].(map[string]interface{})
+		for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"} {
+			if _, exists := env[key]; exists {
+				t.Fatalf("%s still contains %s", path, key)
+			}
+		}
+		if env["OTHER_VAR"] != "keep-this" {
+			t.Fatalf("%s did not preserve OTHER_VAR", path)
+		}
+	}
+}
 
 // Feature: switch-local-mode-fix, Property 11: Load-active restores to global when sessions exist
 // Validates: Requirements 4.1, 4.2
@@ -679,7 +848,6 @@ func TestPropertyStaleSessionCleanup(t *testing.T) {
 		t.Errorf("Property test failed: %v", err)
 	}
 }
-
 
 // Feature: switch-local-mode-fix, Property 13 (additional): Mixed active and stale sessions
 // Validates: Requirements 4.3

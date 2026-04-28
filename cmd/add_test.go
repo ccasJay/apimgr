@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+	"reflect"
 	"testing"
 )
 
@@ -53,6 +55,86 @@ func TestAddCmd(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestCollectInteractivelyPreservesPresetDefaults(t *testing.T) {
+	oldStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe() error: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		_ = reader.Close()
+	})
+	os.Stdin = reader
+
+	if _, err := writer.WriteString("preset-alias\n"); err != nil {
+		t.Fatalf("WriteString() error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+
+	cfg, err := (&InputCollector{}).CollectInteractively(InteractiveDefaults{
+		APIKey:  "sk-from-flag",
+		BaseURL: "https://api.example.com",
+		Model:   "claude-3-opus",
+		Models:  []string{"claude-3-opus", "claude-3-sonnet"},
+	})
+	if err != nil {
+		t.Fatalf("CollectInteractively() error: %v", err)
+	}
+
+	if cfg.Alias != "preset-alias" {
+		t.Fatalf("Alias = %q, want preset-alias", cfg.Alias)
+	}
+	if cfg.APIKey != "sk-from-flag" {
+		t.Fatalf("APIKey = %q, want sk-from-flag", cfg.APIKey)
+	}
+	if cfg.BaseURL != "https://api.example.com" {
+		t.Fatalf("BaseURL = %q, want https://api.example.com", cfg.BaseURL)
+	}
+	if cfg.Model != "claude-3-opus" {
+		t.Fatalf("Model = %q, want claude-3-opus", cfg.Model)
+	}
+	if !reflect.DeepEqual(cfg.Models, []string{"claude-3-opus", "claude-3-sonnet"}) {
+		t.Fatalf("Models = %#v, want preset models", cfg.Models)
+	}
+}
+
+func TestCollectInteractivelyPreservesAuthTokenPreset(t *testing.T) {
+	oldStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe() error: %v", err)
+	}
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		_ = reader.Close()
+	})
+	os.Stdin = reader
+
+	if _, err := writer.WriteString("token-alias\nhttps://api.example.com\n\n"); err != nil {
+		t.Fatalf("WriteString() error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+
+	cfg, err := (&InputCollector{}).CollectInteractively(InteractiveDefaults{
+		AuthToken: "token-from-flag",
+	})
+	if err != nil {
+		t.Fatalf("CollectInteractively() error: %v", err)
+	}
+
+	if cfg.AuthToken != "token-from-flag" {
+		t.Fatalf("AuthToken = %q, want token-from-flag", cfg.AuthToken)
+	}
+	if cfg.APIKey != "" {
+		t.Fatalf("APIKey = %q, want empty", cfg.APIKey)
+	}
 }
 
 func TestAPIConfigBuilder(t *testing.T) {

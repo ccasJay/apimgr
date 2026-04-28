@@ -255,8 +255,8 @@ func (t *Tester) TestBasic() (*TestResult, error) {
 	if resp.StatusCode != http.StatusOK {
 		errCategory := CategorizeError(resp.StatusCode, body)
 		errInfo := CategorizeErrorWithInfo(resp.StatusCode, body, "")
-		
-		isCritical := errCategory == ErrorCategoryAuthFailure || 
+
+		isCritical := errCategory == ErrorCategoryAuthFailure ||
 			errCategory == ErrorCategoryEndpointNotFound ||
 			errCategory == ErrorCategoryModelNotFound
 
@@ -322,7 +322,6 @@ func (t *Tester) TestBasic() (*TestResult, error) {
 
 	return result, nil
 }
-
 
 // TestStreaming performs a streaming compatibility test.
 // It sends a streaming chat completion request and validates the SSE response format.

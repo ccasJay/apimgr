@@ -124,7 +124,6 @@ func TestProperty1_ProviderSpecificRequestFormat(t *testing.T) {
 		nonEmptyStringGen, // model
 	))
 
-
 	// Property: OpenAI configs produce Chat Completions API format with Authorization Bearer header
 	properties.Property("openai config produces correct format", prop.ForAll(
 		func(apiKey string, baseURL string, model string) bool {
@@ -356,7 +355,6 @@ func TestProperty4_StreamingRequestConstruction(t *testing.T) {
 
 	properties.TestingRun(t)
 }
-
 
 // **Feature: api-compatibility-test, Property 8: Custom path override**
 // **Validates: Requirements 4.4**

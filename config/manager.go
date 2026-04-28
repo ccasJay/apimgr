@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,31 +75,59 @@ func (cm *Manager) GetConfigPath() string {
 	return cm.configPath
 }
 
-// loadConfigFile loads the config file with locking
+func (cm *Manager) openConfigLock(exclusive bool) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(cm.configPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	lockPath := cm.configPath + ".lock"
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open config lock file: %w", err)
+	}
+
+	var lockErr error
+	if exclusive {
+		lockErr = cm.lockFile(file)
+	} else {
+		lockErr = cm.lockFileShared(file)
+	}
+	if lockErr != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("failed to lock config file: %w", lockErr)
+	}
+
+	return file, nil
+}
+
+func (cm *Manager) closeConfigLock(file *os.File) error {
+	unlockErr := cm.unlockFile(file)
+	closeErr := file.Close()
+	if unlockErr != nil {
+		return unlockErr
+	}
+	return closeErr
+}
+
+// loadConfigFile loads the config file with shared locking.
 func (cm *Manager) loadConfigFile() (*models.File, error) {
-	// Open the file with read lock
-	file, err := os.OpenFile(cm.configPath, os.O_RDONLY, 0600)
+	lockFile, err := cm.openConfigLock(false)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = cm.closeConfigLock(lockFile)
+	}()
+
+	return cm.loadConfigFileLocked()
+}
+
+func (cm *Manager) loadConfigFileLocked() (*models.File, error) {
+	data, err := os.ReadFile(cm.configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &models.File{Configs: []models.APIConfig{}}, nil
 		}
-		return nil, fmt.Errorf("failed to open config file: %w", err)
-	}
-	defer file.Close()
-
-	// Lock the file for shared read access (LOCK_SH)
-	if err := cm.lockFileShared(file); err != nil {
-		return nil, fmt.Errorf("failed to lock config file: %w", err)
-	}
-	defer func() {
-		if err := cm.unlockFile(file); err != nil {
-			// fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
-		}
-	}()
-
-	// Read from the locked file descriptor instead of using os.ReadFile
-	data, err := os.ReadFile(cm.configPath)
-	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
@@ -129,42 +158,76 @@ func (cm *Manager) loadConfigFile() (*models.File, error) {
 	return &configFile, nil
 }
 
-// saveConfigFile saves the config file with locking
+// saveConfigFile saves the config file with exclusive locking.
 func (cm *Manager) saveConfigFile(configFile *models.File) error {
+	lockFile, err := cm.openConfigLock(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = cm.closeConfigLock(lockFile)
+	}()
+
+	return cm.saveConfigFileLocked(configFile)
+}
+
+func (cm *Manager) saveConfigFileLocked(configFile *models.File) error {
 	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
-	// Open the file with write access (create if not exists)
-	file, err := os.OpenFile(cm.configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	configDir := filepath.Dir(cm.configPath)
+	tmpFile, err := os.CreateTemp(configDir, filepath.Base(cm.configPath)+".tmp-*")
 	if err != nil {
-		return fmt.Errorf("failed to open config file: %w", err)
+		return fmt.Errorf("failed to create temporary config file: %w", err)
 	}
-	defer file.Close()
-
-	// Lock the file for exclusive write access
-	if err := cm.lockFile(file); err != nil {
-		return fmt.Errorf("failed to lock config file: %w", err)
-	}
+	tmpName := tmpFile.Name()
 	defer func() {
-		if err := cm.unlockFile(file); err != nil {
-			// fmt.Printf("⚠️  Failed to unlock file: %v\n", err)
-		}
+		_ = os.Remove(tmpName)
 	}()
 
-	// Write the file while holding the lock
-	_, err = file.Write(data)
-	if err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to write temporary config file: %w", err)
 	}
-
-	// Ensure data is flushed to disk
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync config file: %w", err)
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to sync temporary config file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary config file: %w", err)
+	}
+	if err := os.Chmod(tmpName, 0600); err != nil {
+		return fmt.Errorf("failed to set config file permissions: %w", err)
+	}
+	if err := os.Rename(tmpName, cm.configPath); err != nil {
+		return fmt.Errorf("failed to replace config file: %w", err)
+	}
+	if err := storage.SyncDirectory(configDir); err != nil {
+		return fmt.Errorf("failed to sync config directory: %w", err)
 	}
 
 	return nil
+}
+
+func (cm *Manager) updateConfigFile(update func(*models.File) error) error {
+	lockFile, err := cm.openConfigLock(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = cm.closeConfigLock(lockFile)
+	}()
+
+	configFile, err := cm.loadConfigFileLocked()
+	if err != nil {
+		return err
+	}
+	if err := update(configFile); err != nil {
+		return err
+	}
+	return cm.saveConfigFileLocked(configFile)
 }
 
 // lockFile locks the config file with exclusive lock (for write operations)
@@ -199,12 +262,10 @@ func (cm *Manager) Save(configs []models.APIConfig) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-	configFile.Configs = configs
-	return cm.saveConfigFile(configFile)
+	return cm.updateConfigFile(func(configFile *models.File) error {
+		configFile.Configs = configs
+		return nil
+	})
 }
 
 // Add adds a new configuration
@@ -222,21 +283,18 @@ func (cm *Manager) Add(config models.APIConfig) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configs, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
-	// Check if alias already exists
-	for i, existingConfig := range configs.Configs {
-		if existingConfig.Alias == config.Alias {
-			configs.Configs[i] = config
-			return cm.saveConfigFile(configs)
+	return cm.updateConfigFile(func(configs *models.File) error {
+		// Check if alias already exists
+		for i, existingConfig := range configs.Configs {
+			if existingConfig.Alias == config.Alias {
+				configs.Configs[i] = config
+				return nil
+			}
 		}
-	}
 
-	configs.Configs = append(configs.Configs, config)
-	return cm.saveConfigFile(configs)
+		configs.Configs = append(configs.Configs, config)
+		return nil
+	})
 }
 
 // Remove removes a configuration by alias
@@ -244,23 +302,20 @@ func (cm *Manager) Remove(alias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configs, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
-	for i, config := range configs.Configs {
-		if config.Alias == alias {
-			configs.Configs = append(configs.Configs[:i], configs.Configs[i+1:]...)
-			// If removing the active config, clear the active config
-			if configs.Active == alias {
-				configs.Active = ""
+	return cm.updateConfigFile(func(configs *models.File) error {
+		for i, config := range configs.Configs {
+			if config.Alias == alias {
+				configs.Configs = append(configs.Configs[:i], configs.Configs[i+1:]...)
+				// If removing the active config, clear the active config
+				if configs.Active == alias {
+					configs.Active = ""
+				}
+				return nil
 			}
-			return cm.saveConfigFile(configs)
 		}
-	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+		return fmt.Errorf("configuration '%s' does not exist", alias)
+	})
 }
 
 // Get returns a configuration by alias
@@ -299,26 +354,23 @@ func (cm *Manager) SetActive(alias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
-	// Verify the alias exists
-	found := false
-	for _, config := range configFile.Configs {
-		if config.Alias == alias {
-			found = true
-			break
+	if err := cm.updateConfigFile(func(configFile *models.File) error {
+		// Verify the alias exists
+		found := false
+		for _, config := range configFile.Configs {
+			if config.Alias == alias {
+				found = true
+				break
+			}
 		}
-	}
 
-	if !found {
-		return fmt.Errorf("configuration '%s' does not exist", alias)
-	}
+		if !found {
+			return fmt.Errorf("configuration '%s' does not exist", alias)
+		}
 
-	configFile.Active = alias
-	if err := cm.saveConfigFile(configFile); err != nil {
+		configFile.Active = alias
+		return nil
+	}); err != nil {
 		return err
 	}
 
@@ -376,44 +428,41 @@ func (cm *Manager) UpdatePartial(alias string, updates map[string]string) error 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
-	for i, config := range configFile.Configs {
-		if config.Alias == alias {
-			// Update only the fields that are provided
-			if apiKey, ok := updates["api_key"]; ok {
-				configFile.Configs[i].APIKey = apiKey
-				if apiKey != "" {
-					configFile.Configs[i].AuthToken = "" // Clear auth token
+	return cm.updateConfigFile(func(configFile *models.File) error {
+		for i, config := range configFile.Configs {
+			if config.Alias == alias {
+				// Update only the fields that are provided
+				if apiKey, ok := updates["api_key"]; ok {
+					configFile.Configs[i].APIKey = apiKey
+					if apiKey != "" {
+						configFile.Configs[i].AuthToken = "" // Clear auth token
+					}
 				}
-			}
-			if authToken, ok := updates["auth_token"]; ok {
-				configFile.Configs[i].AuthToken = authToken
-				if authToken != "" {
-					configFile.Configs[i].APIKey = "" // Clear API key
+				if authToken, ok := updates["auth_token"]; ok {
+					configFile.Configs[i].AuthToken = authToken
+					if authToken != "" {
+						configFile.Configs[i].APIKey = "" // Clear API key
+					}
 				}
-			}
-			if baseURL, ok := updates["base_url"]; ok {
-				configFile.Configs[i].BaseURL = baseURL
-			}
-			if model, ok := updates["model"]; ok {
-				configFile.Configs[i].Model = model
-			}
+				if baseURL, ok := updates["base_url"]; ok {
+					configFile.Configs[i].BaseURL = baseURL
+				}
+				if model, ok := updates["model"]; ok {
+					configFile.Configs[i].Model = model
+				}
 
-			// Validate the updated config
-			validator := validation.NewValidator()
-			if err := validator.ValidateConfig(configFile.Configs[i]); err != nil {
-				return err
-			}
+				// Validate the updated config
+				validator := validation.NewValidator()
+				if err := validator.ValidateConfig(configFile.Configs[i]); err != nil {
+					return err
+				}
 
-			return cm.saveConfigFile(configFile)
+				return nil
+			}
 		}
-	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+		return fmt.Errorf("configuration '%s' does not exist", alias)
+	})
 }
 
 // RenameAlias renames a configuration alias
@@ -421,38 +470,35 @@ func (cm *Manager) RenameAlias(oldAlias, newAlias string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
-	// Check if new alias already exists
-	for _, cfg := range configFile.Configs {
-		if cfg.Alias == newAlias {
-			return fmt.Errorf("configuration '%s' already exists", newAlias)
+	return cm.updateConfigFile(func(configFile *models.File) error {
+		// Check if new alias already exists
+		for _, cfg := range configFile.Configs {
+			if cfg.Alias == newAlias {
+				return fmt.Errorf("configuration '%s' already exists", newAlias)
+			}
 		}
-	}
 
-	// Find and rename
-	found := false
-	for i, cfg := range configFile.Configs {
-		if cfg.Alias == oldAlias {
-			configFile.Configs[i].Alias = newAlias
-			found = true
-			break
+		// Find and rename
+		found := false
+		for i, cfg := range configFile.Configs {
+			if cfg.Alias == oldAlias {
+				configFile.Configs[i].Alias = newAlias
+				found = true
+				break
+			}
 		}
-	}
 
-	if !found {
-		return fmt.Errorf("configuration '%s' does not exist", oldAlias)
-	}
+		if !found {
+			return fmt.Errorf("configuration '%s' does not exist", oldAlias)
+		}
 
-	// Update active config if needed
-	if configFile.Active == oldAlias {
-		configFile.Active = newAlias
-	}
+		// Update active config if needed
+		if configFile.Active == oldAlias {
+			configFile.Active = newAlias
+		}
 
-	return cm.saveConfigFile(configFile)
+		return nil
+	})
 }
 
 // SwitchModel switches the active model for a configuration.
@@ -461,38 +507,37 @@ func (cm *Manager) SwitchModel(alias string, model string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
+	updateActiveScript := false
+
+	if err := cm.updateConfigFile(func(configFile *models.File) error {
+		// Find the configuration by alias
+		for i, config := range configFile.Configs {
+			if config.Alias == alias {
+				// Validate model is in supported list
+				validator := validation.NewModelValidator()
+				if err := validator.ValidateModelInList(model, config.Models); err != nil {
+					return err
+				}
+
+				// Update active model
+				configFile.Configs[i].Model = model
+				updateActiveScript = configFile.Active == alias
+
+				return nil
+			}
+		}
+
+		return fmt.Errorf("configuration '%s' does not exist", alias)
+	}); err != nil {
 		return err
 	}
 
-	// Find the configuration by alias
-	for i, config := range configFile.Configs {
-		if config.Alias == alias {
-			// Validate model is in supported list
-			validator := validation.NewModelValidator()
-			if err := validator.ValidateModelInList(model, config.Models); err != nil {
-				return err
-			}
-
-			// Update active model
-			configFile.Configs[i].Model = model
-
-			// Save configuration
-			if err := cm.saveConfigFile(configFile); err != nil {
-				return err
-			}
-
-			// If this is the active configuration, update the active.env
-			if configFile.Active == alias {
-				return cm.generateActiveScript()
-			}
-
-			return nil
-		}
+	// If this is the active configuration, update the active.env
+	if updateActiveScript {
+		return cm.generateActiveScript()
 	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+	return nil
 }
 
 // GetModels returns the supported models list for a configuration.
@@ -519,58 +564,57 @@ func (cm *Manager) GetModels(alias string) ([]string, error) {
 
 // SetModels updates the supported models list for a configuration.
 // It validates the models list and handles active model fallback when the current active model is removed.
-func (cm *Manager) SetModels(alias string, models []string) error {
+func (cm *Manager) SetModels(alias string, modelNames []string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	// Validate and normalize the models list
 	validator := validation.NewModelValidator()
-	normalizedModels := validator.NormalizeModels(models)
+	normalizedModels := validator.NormalizeModels(modelNames)
 	if err := validator.ValidateModelsList(normalizedModels); err != nil {
 		return err
 	}
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
+	updateActiveScript := false
+
+	if err := cm.updateConfigFile(func(configFile *models.File) error {
+		// Find the configuration by alias
+		for i, config := range configFile.Configs {
+			if config.Alias == alias {
+				// Update models list
+				configFile.Configs[i].Models = normalizedModels
+
+				// Handle active model fallback when removed
+				// Check if current active model is still in the new list
+				activeModelInList := false
+				for _, m := range normalizedModels {
+					if m == config.Model {
+						activeModelInList = true
+						break
+					}
+				}
+
+				// If active model is not in the new list, fallback to first model
+				if !activeModelInList && len(normalizedModels) > 0 {
+					configFile.Configs[i].Model = normalizedModels[0]
+				}
+
+				updateActiveScript = configFile.Active == alias
+				return nil
+			}
+		}
+
+		return fmt.Errorf("configuration '%s' does not exist", alias)
+	}); err != nil {
 		return err
 	}
 
-	// Find the configuration by alias
-	for i, config := range configFile.Configs {
-		if config.Alias == alias {
-			// Update models list
-			configFile.Configs[i].Models = normalizedModels
-
-			// Handle active model fallback when removed
-			// Check if current active model is still in the new list
-			activeModelInList := false
-			for _, m := range normalizedModels {
-				if m == config.Model {
-					activeModelInList = true
-					break
-				}
-			}
-
-			// If active model is not in the new list, fallback to first model
-			if !activeModelInList && len(normalizedModels) > 0 {
-				configFile.Configs[i].Model = normalizedModels[0]
-			}
-
-			// Save configuration
-			if err := cm.saveConfigFile(configFile); err != nil {
-				return err
-			}
-
-			// If this is the active configuration, update the active.env
-			if configFile.Active == alias {
-				return cm.generateActiveScript()
-			}
-
-			return nil
-		}
+	// If this is the active configuration, update the active.env
+	if updateActiveScript {
+		return cm.generateActiveScript()
 	}
 
-	return fmt.Errorf("configuration '%s' does not exist", alias)
+	return nil
 }
 
 // GenerateActiveScript generates the activation script for active configuration
@@ -633,29 +677,60 @@ func (cm *Manager) generateActiveScript() error {
 // without updating global active field or generating active.env file.
 // This is used for local mode to update Claude Code immediately.
 func (cm *Manager) SyncClaudeSettingsOnly(cfg *models.APIConfig) error {
-	// Sync to global Claude Code settings
 	if err := cm.syncClaudeSettings(cfg); err != nil {
-		return fmt.Errorf("failed to sync to global Claude Code settings: %v", err)
+		return fmt.Errorf("failed to sync to Claude Code settings: %v", err)
 	}
 
 	return nil
 }
 
-// syncClaudeSettings syncs configuration to global Claude Code settings file
-// Uses surgical update mechanism to preserve JSON structure and non-ANTHROPIC fields
-func (cm *Manager) syncClaudeSettings(cfg *models.APIConfig) error {
-	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
-
-	// Check if Claude Code config file exists
-	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
-		// models.File doesn't exist, skip sync
-		return nil
+func (cm *Manager) claudeSettingsPaths() []string {
+	var paths []string
+	seen := make(map[string]bool)
+	addPath := func(path string) {
+		if path == "" || seen[path] {
+			return
+		}
+		seen[path] = true
+		paths = append(paths, path)
 	}
 
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		addPath(filepath.Join(homeDir, ".claude", "settings.json"))
+	}
+	if workDir, err := os.Getwd(); err == nil {
+		addPath(filepath.Join(workDir, ".claude", "settings.json"))
+	}
+
+	return paths
+}
+
+// syncClaudeSettings syncs configuration to existing Claude Code settings files.
+// Uses surgical update mechanism to preserve JSON structure and non-ANTHROPIC fields
+func (cm *Manager) syncClaudeSettings(cfg *models.APIConfig) error {
+	var errs []error
+	for _, claudeSettingsPath := range cm.claudeSettingsPaths() {
+		if _, err := os.Stat(claudeSettingsPath); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			errs = append(errs, fmt.Errorf("%s: %w", claudeSettingsPath, err))
+			continue
+		}
+
+		if err := cm.syncClaudeSettingsFile(claudeSettingsPath, cfg); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", claudeSettingsPath, err))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (cm *Manager) syncClaudeSettingsFile(claudeSettingsPath string, cfg *models.APIConfig) error {
 	// Read existing settings content (raw to preserve structure and comments)
 	originalContent, err := os.ReadFile(claudeSettingsPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read global Claude Code settings: %v", err)
+		return fmt.Errorf("failed to read Claude Code settings: %w", err)
 	}
 
 	// Create synchronization options
@@ -668,7 +743,7 @@ func (cm *Manager) syncClaudeSettings(cfg *models.APIConfig) error {
 	// Perform surgical update using sjson
 	updatedContent, err := syncpkg.UpdateEnvField(string(originalContent), cfg, opts)
 	if err != nil {
-		return fmt.Errorf("Failed to update settings content: %v", err)
+		return fmt.Errorf("failed to update settings content: %w", err)
 	}
 
 	// Write back to file using atomic update to prevent data corruption
@@ -676,9 +751,9 @@ func (cm *Manager) syncClaudeSettings(cfg *models.APIConfig) error {
 		// Attempt to restore from backup if update fails
 		restoreErr := storage.NewBackupManager(storage.DefaultBackupRetention).RestoreFromLatestBackup(claudeSettingsPath)
 		if restoreErr != nil {
-			return fmt.Errorf("Failed to write settings file and restore from backup: update error=%v, restore error=%v", err, restoreErr)
+			return fmt.Errorf("failed to write settings file and restore from backup: update error=%v, restore error=%v", err, restoreErr)
 		}
-		return fmt.Errorf("Failed to write settings file but restored from backup: %v", err)
+		return fmt.Errorf("failed to write settings file but restored from backup: %w", err)
 	}
 
 	return nil
@@ -700,22 +775,23 @@ func (cm *Manager) RestoreClaudeToGlobal() error {
 
 // clearClaudeSettings removes ANTHROPIC_* environment variables from Claude Code settings files
 func (cm *Manager) clearClaudeSettings() error {
-	// Clear global Claude Code settings
-	if err := cm.clearGlobalClaudeSettings(); err != nil {
-		return fmt.Errorf("failed to clear global Claude Code settings: %v", err)
+	var errs []error
+	for _, claudeSettingsPath := range cm.claudeSettingsPaths() {
+		if err := cm.clearClaudeSettingsFile(claudeSettingsPath); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", claudeSettingsPath, err))
+		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
-// clearGlobalClaudeSettings removes ANTHROPIC_* env vars from global Claude Code settings
-func (cm *Manager) clearGlobalClaudeSettings() error {
-	claudeSettingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
-
+func (cm *Manager) clearClaudeSettingsFile(claudeSettingsPath string) error {
 	// Check if Claude Code config file exists
 	if _, err := os.Stat(claudeSettingsPath); os.IsNotExist(err) {
 		// models.File doesn't exist, nothing to clear
 		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to stat Claude Code settings: %w", err)
 	}
 
 	// Read existing settings
@@ -735,7 +811,11 @@ func (cm *Manager) clearGlobalClaudeSettings() error {
 		return nil
 	}
 
-	env := settings["env"].(map[string]interface{})
+	env, ok := settings["env"].(map[string]interface{})
+	if !ok {
+		// Preserve malformed or non-object env fields instead of panicking.
+		return nil
+	}
 
 	// Clear ANTHROPIC related variables
 	delete(env, "ANTHROPIC_API_KEY")
@@ -749,7 +829,7 @@ func (cm *Manager) clearGlobalClaudeSettings() error {
 		return fmt.Errorf("failed to serialize global Claude Code settings: %v", err)
 	}
 
-	if err := os.WriteFile(claudeSettingsPath, updatedData, 0600); err != nil {
+	if err := storage.AtomicFileUpdate(claudeSettingsPath, string(updatedData), true); err != nil {
 		return fmt.Errorf("failed to write global Claude Code settings: %v", err)
 	}
 
@@ -761,16 +841,11 @@ func (cm *Manager) Disable() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	configFile, err := cm.loadConfigFile()
-	if err != nil {
-		return err
-	}
-
 	// 1. Clear active alias
-	configFile.Active = ""
-
-	// 2. Save configuration
-	if err := cm.saveConfigFile(configFile); err != nil {
+	if err := cm.updateConfigFile(func(configFile *models.File) error {
+		configFile.Active = ""
+		return nil
+	}); err != nil {
 		return err
 	}
 

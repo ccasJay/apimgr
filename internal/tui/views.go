@@ -143,7 +143,7 @@ func (m Model) renderConfigLine(index int, cfg models.APIConfig) string {
 
 	// Build the main line content
 	alias := cfg.Alias
-	
+
 	// Add model info if available
 	modelInfo := ""
 	if cfg.Model != "" {
@@ -348,22 +348,22 @@ func (m Model) RenderDeleteConfirm() string {
 
 	if m.cursor >= 0 && m.cursor < len(m.configs) {
 		cfg := m.configs[m.cursor]
-		
+
 		// Warning message
 		b.WriteString(errorStyle.Render("⚠ 警告: 此操作不可撤销！"))
 		b.WriteString("\n\n")
-		
+
 		// Config info to be deleted
 		b.WriteString(normalStyle.Render("即将删除配置: "))
 		b.WriteString(selectedStyle.Render(cfg.Alias))
 		b.WriteString("\n\n")
-		
+
 		// Show if this is the active config
 		if cfg.Alias == m.activeAlias {
 			b.WriteString(errorStyle.Render("注意: 这是当前活跃的配置！"))
 			b.WriteString("\n\n")
 		}
-		
+
 		// Show config details
 		if cfg.BaseURL != "" {
 			b.WriteString(dimStyle.Render(fmt.Sprintf("Base URL: %s", m.truncateText(cfg.BaseURL, effectiveWidth-12))))

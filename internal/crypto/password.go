@@ -30,9 +30,9 @@ const (
 
 // ExportFormat represents the unencrypted export format
 type ExportFormat struct {
-	Version   string           `json:"version"`
-	Timestamp int64            `json:"timestamp"`
-	Configs   []ExportConfig   `json:"configs"`
+	Version   string         `json:"version"`
+	Timestamp int64          `json:"timestamp"`
+	Configs   []ExportConfig `json:"configs"`
 }
 
 // ExportConfig represents a single exported configuration

@@ -299,7 +299,6 @@ func (e *testError) Error() string {
 	return e.msg
 }
 
-
 // TestHandleDetailViewKeysEdit tests the 'e' key handling in detail view
 // Requirements: 6.1
 func TestHandleDetailViewKeysEdit(t *testing.T) {
@@ -359,7 +358,6 @@ func TestHandleDetailViewKeysEdit(t *testing.T) {
 		})
 	}
 }
-
 
 // TestInitModelSelect tests the initModelSelect method
 // Requirements: 12.1, 12.2
@@ -565,11 +563,11 @@ func TestHandleModelSelectViewKeys(t *testing.T) {
 // Requirements: 12.1, 12.4
 func TestHandleMainViewKeysModel(t *testing.T) {
 	tests := []struct {
-		name              string
-		configs           []models.APIConfig
-		cursor            int
-		expectViewState   ViewState
-		expectErrorMsg    string
+		name            string
+		configs         []models.APIConfig
+		cursor          int
+		expectViewState ViewState
+		expectErrorMsg  string
 	}{
 		{
 			name: "press m with multiple models",
@@ -732,7 +730,6 @@ func TestRenderModelSelectView(t *testing.T) {
 	}
 }
 
-
 // TestHandleMainViewKeysPing tests the 'p' key handling in main view
 // Requirements: 8.1
 func TestHandleMainViewKeysPing(t *testing.T) {
@@ -859,11 +856,11 @@ func TestHandleDetailViewKeysPing(t *testing.T) {
 // Requirements: 8.3, 8.4
 func TestPingResultMsgHandling(t *testing.T) {
 	tests := []struct {
-		name              string
-		msg               PingResultMsg
-		expectSuccess     bool
-		expectViewState   ViewState
-		expectTestResult  bool
+		name             string
+		msg              PingResultMsg
+		expectSuccess    bool
+		expectViewState  ViewState
+		expectTestResult bool
 	}{
 		{
 			name: "successful ping",
@@ -1104,16 +1101,15 @@ func TestHandlePingTestingViewKeys(t *testing.T) {
 	}
 }
 
-
 // TestWindowSizeMsg tests the WindowSizeMsg handling in Update
 // Requirements: 11.1
 func TestWindowSizeMsg(t *testing.T) {
 	tests := []struct {
-		name         string
-		initialWidth int
+		name          string
+		initialWidth  int
 		initialHeight int
-		newWidth     int
-		newHeight    int
+		newWidth      int
+		newHeight     int
 	}{
 		{
 			name:          "resize to larger",
@@ -1172,8 +1168,8 @@ func TestWindowSizeMsg(t *testing.T) {
 // Requirements: 11.1, 11.3
 func TestGetVisibleListHeight(t *testing.T) {
 	tests := []struct {
-		name           string
-		height         int
+		name            string
+		height          int
 		expectMinHeight int
 	}{
 		{
@@ -1405,10 +1401,10 @@ func TestGetEffectiveWidth(t *testing.T) {
 // Requirements: 11.2
 func TestTruncateText(t *testing.T) {
 	tests := []struct {
-		name      string
-		text      string
-		maxWidth  int
-		expected  string
+		name     string
+		text     string
+		maxWidth int
+		expected string
 	}{
 		{
 			name:     "short text no truncation",

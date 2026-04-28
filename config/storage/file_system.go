@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // FileExists checks if a file exists
@@ -23,8 +24,14 @@ func AtomicFileUpdate(filePath string, newContent string, createBackup bool) err
 		}
 	}
 
+	dir := filepath.Dir(filePath)
+	mode := os.FileMode(0600)
+	if info, err := os.Stat(filePath); err == nil {
+		mode = info.Mode().Perm()
+	}
+
 	// Create temporary file in the same directory
-	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), "settings.json.tmp")
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(filePath)+".tmp-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -32,19 +39,28 @@ func AtomicFileUpdate(filePath string, newContent string, createBackup bool) err
 
 	// Write new content to temporary file
 	if _, err := tmpFile.WriteString(newContent); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write to temporary file: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to sync temporary file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
 
-	// Change file permissions to match existing file (0600)
-	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
+	// Change file permissions to match existing file.
+	if err := os.Chmod(tmpFile.Name(), mode); err != nil {
 		return fmt.Errorf("failed to set permissions on temporary file: %w", err)
 	}
 
 	// Atomic rename - this is guaranteed to be atomic on all POSIX systems
 	if err := os.Rename(tmpFile.Name(), filePath); err != nil {
 		return fmt.Errorf("failed to rename temporary file: %w", err)
+	}
+	if err := SyncDirectory(dir); err != nil {
+		return fmt.Errorf("failed to sync directory: %w", err)
 	}
 
 	// Cleanup old backups after successful update
@@ -56,6 +72,19 @@ func AtomicFileUpdate(filePath string, newContent string, createBackup bool) err
 		}
 	}
 
+	return nil
+}
+
+func SyncDirectory(dir string) error {
+	dirFile, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer dirFile.Close()
+
+	if err := dirFile.Sync(); err != nil && runtime.GOOS != "windows" {
+		return err
+	}
 	return nil
 }
 

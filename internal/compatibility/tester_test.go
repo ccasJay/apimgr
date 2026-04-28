@@ -204,29 +204,29 @@ func TestTesterOptions(t *testing.T) {
 // TestDetectProviderFromURL tests the provider auto-detection from URL
 func TestDetectProviderFromURL(t *testing.T) {
 	tests := []struct {
-		name           string
-		url            string
+		name             string
+		url              string
 		expectedProvider string
-		expectedOK     bool
+		expectedOK       bool
 	}{
 		// Anthropic URLs
 		{"anthropic api url", "https://api.anthropic.com", "anthropic", true},
 		{"anthropic api url with path", "https://api.anthropic.com/v1/messages", "anthropic", true},
 		{"anthropic api url with port", "https://api.anthropic.com:443", "anthropic", true},
 		{"anthropic subdomain", "https://proxy.api.anthropic.com", "anthropic", true},
-		
+
 		// OpenAI URLs
 		{"openai api url", "https://api.openai.com", "openai", true},
 		{"openai api url with path", "https://api.openai.com/v1/chat/completions", "openai", true},
 		{"openai api url with port", "https://api.openai.com:443", "openai", true},
 		{"openai subdomain", "https://proxy.api.openai.com", "openai", true},
-		
+
 		// Unknown/ambiguous URLs
 		{"localhost", "http://localhost:8080", "", false},
 		{"custom domain", "https://my-llm-proxy.example.com", "", false},
 		{"empty url", "", "", false},
 		{"invalid url", "not-a-url", "", false},
-		
+
 		// Case insensitivity
 		{"uppercase anthropic", "https://API.ANTHROPIC.COM", "anthropic", true},
 		{"mixed case openai", "https://Api.OpenAI.Com", "openai", true},

@@ -13,6 +13,6 @@ type APIConfig struct {
 
 // File represents the structure of the config file
 type File struct {
-	Active  string     `json:"active"`
+	Active  string      `json:"active"`
 	Configs []APIConfig `json:"configs"`
 }

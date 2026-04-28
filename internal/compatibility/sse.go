@@ -20,12 +20,12 @@ type SSEEvent struct {
 
 // SSEValidationResult represents the result of SSE stream validation
 type SSEValidationResult struct {
-	Valid              bool     `json:"valid"`
-	EventCount         int      `json:"eventCount"`
-	HasCompletionSignal bool    `json:"hasCompletionSignal"`
-	CompletionType     string   `json:"completionType,omitempty"` // "done" for OpenAI, "message_stop" for Anthropic
-	MalformedLines     []string `json:"malformedLines,omitempty"`
-	Errors             []string `json:"errors,omitempty"`
+	Valid               bool     `json:"valid"`
+	EventCount          int      `json:"eventCount"`
+	HasCompletionSignal bool     `json:"hasCompletionSignal"`
+	CompletionType      string   `json:"completionType,omitempty"` // "done" for OpenAI, "message_stop" for Anthropic
+	MalformedLines      []string `json:"malformedLines,omitempty"`
+	Errors              []string `json:"errors,omitempty"`
 }
 
 // SSEParser parses Server-Sent Events from a stream
@@ -120,7 +120,6 @@ func (p *SSEParser) ParseAll() ([]*SSEEvent, error) {
 	return events, nil
 }
 
-
 // SSEValidator defines the interface for validating SSE streams
 type SSEValidator interface {
 	// ValidateStream validates an SSE stream and returns the validation result
@@ -188,9 +187,9 @@ func (v *AnthropicSSEValidator) IsValidEventFormat(event *SSEEvent) bool {
 // ValidateStream validates an Anthropic SSE stream
 func (v *AnthropicSSEValidator) ValidateStream(reader io.Reader) (*SSEValidationResult, error) {
 	result := &SSEValidationResult{
-		Valid:              true,
-		MalformedLines:     []string{},
-		Errors:             []string{},
+		Valid:          true,
+		MalformedLines: []string{},
+		Errors:         []string{},
 	}
 
 	parser := NewSSEParser(reader)
@@ -205,7 +204,7 @@ func (v *AnthropicSSEValidator) ValidateStream(reader io.Reader) (*SSEValidation
 
 	for _, event := range events {
 		if !v.IsValidEventFormat(event) {
-			result.MalformedLines = append(result.MalformedLines, 
+			result.MalformedLines = append(result.MalformedLines,
 				fmt.Sprintf("event=%s, data=%s", event.Event, truncateString(event.Data, 50)))
 		}
 
@@ -267,9 +266,9 @@ func (v *OpenAISSEValidator) IsValidEventFormat(event *SSEEvent) bool {
 // ValidateStream validates an OpenAI SSE stream
 func (v *OpenAISSEValidator) ValidateStream(reader io.Reader) (*SSEValidationResult, error) {
 	result := &SSEValidationResult{
-		Valid:              true,
-		MalformedLines:     []string{},
-		Errors:             []string{},
+		Valid:          true,
+		MalformedLines: []string{},
+		Errors:         []string{},
 	}
 
 	parser := NewSSEParser(reader)

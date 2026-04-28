@@ -143,25 +143,8 @@ Using -m/--model parameter switches to a specific model within the configuration
 		}
 
 		// Clear previous environment variables
-		fmt.Println("unset ANTHROPIC_API_KEY")
-		fmt.Println("unset ANTHROPIC_AUTH_TOKEN")
-		fmt.Println("unset ANTHROPIC_BASE_URL")
-		fmt.Println("unset ANTHROPIC_MODEL")
-		fmt.Println("unset APIMGR_ACTIVE")
-
-		// Export new environment variables
-		if apiConfig.APIKey != "" {
-			fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
-		} else if apiConfig.AuthToken != "" {
-			fmt.Printf("export ANTHROPIC_AUTH_TOKEN=\"%s\"\n", apiConfig.AuthToken)
-		}
-		if apiConfig.BaseURL != "" {
-			fmt.Printf("export ANTHROPIC_BASE_URL=\"%s\"\n", apiConfig.BaseURL)
-		}
-		if apiConfig.Model != "" {
-			fmt.Printf("export ANTHROPIC_MODEL=\"%s\"\n", apiConfig.Model)
-		}
-		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", alias)
+		writeShellUnsets(os.Stdout)
+		writeShellExports(os.Stdout, apiConfig, alias)
 
 		if local {
 			fmt.Fprintln(os.Stderr, successStyle.Render(fmt.Sprintf("✓ Switched to configuration locally: %s", alias)))

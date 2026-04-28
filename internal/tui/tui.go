@@ -22,17 +22,17 @@ func Run() error {
 	}
 
 	m := NewModel(configManager)
-	
+
 	// Create program with options that work better across different terminals
 	opts := []tea.ProgramOption{
 		tea.WithAltScreen(),
 	}
-	
+
 	// Add input/output options for better compatibility
 	if os.Getenv("TERM") != "" {
 		opts = append(opts, tea.WithMouseCellMotion())
 	}
-	
+
 	p := tea.NewProgram(m, opts...)
 
 	_, err = p.Run()

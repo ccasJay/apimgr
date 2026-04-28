@@ -1,10 +1,10 @@
 package validation
 
 import (
-	"fmt"
 	"apimgr/config/models"
 	"apimgr/internal/providers"
 	"apimgr/internal/utils"
+	"fmt"
 )
 
 // Validator validates API configurations
@@ -28,7 +28,7 @@ func (v *Validator) ValidateConfig(config models.APIConfig) error {
 		providerName = "anthropic"
 	}
 
-// APIKey and AuthToken are mutually exclusive
+	// APIKey and AuthToken are mutually exclusive
 	if config.APIKey != "" && config.AuthToken != "" {
 		return fmt.Errorf("API key and auth token cannot be used at the same time")
 	}

@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	lockTimeout     = 5 * time.Second
-	lockRetryDelay  = 50 * time.Millisecond
+	lockTimeout    = 5 * time.Second
+	lockRetryDelay = 50 * time.Millisecond
 )
 
 // lockFileExclusive acquires an exclusive lock (write lock) with timeout
@@ -29,24 +29,24 @@ func lockFileShared(f *os.File) error {
 // lockWithTimeout attempts to acquire a lock with timeout to prevent blocking
 func lockWithTimeout(f *os.File, lockType int) error {
 	deadline := time.Now().Add(lockTimeout)
-	
+
 	for {
 		// Try non-blocking lock first
 		err := unix.Flock(int(f.Fd()), lockType|unix.LOCK_NB)
 		if err == nil {
 			return nil
 		}
-		
+
 		// If error is not EWOULDBLOCK, return immediately
 		if err != unix.EWOULDBLOCK && err != unix.EAGAIN {
 			return fmt.Errorf("failed to acquire lock: %w", err)
 		}
-		
+
 		// Check timeout
 		if time.Now().After(deadline) {
 			return fmt.Errorf("lock timeout: file is locked by another process")
 		}
-		
+
 		// Wait before retry
 		time.Sleep(lockRetryDelay)
 	}

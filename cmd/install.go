@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	forceInstall         bool
-	noShellIntegration   bool
+	forceInstall       bool
+	noShellIntegration bool
 )
 
 var installCmd = &cobra.Command{

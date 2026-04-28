@@ -393,7 +393,6 @@ func TestFormHints(t *testing.T) {
 	}
 }
 
-
 // TestRenderForm tests the RenderForm function
 // Requirements: 5.2, 6.2
 func TestRenderForm(t *testing.T) {

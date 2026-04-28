@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"apimgr/config/models"
+	"apimgr/internal/utils"
 )
 
 // GenerateEnvScript generates environment variable script content
@@ -27,17 +28,17 @@ func GenerateEnvScript(cfg *models.APIConfig) string {
 	// Set new environment variables
 	buf.WriteString("# Set new environment variables\n")
 	if cfg.APIKey != "" {
-		buf.WriteString(fmt.Sprintf("export ANTHROPIC_API_KEY=%q\n", cfg.APIKey))
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_API_KEY=%s\n", utils.ShellQuote(cfg.APIKey)))
 	} else if cfg.AuthToken != "" {
-		buf.WriteString(fmt.Sprintf("export ANTHROPIC_AUTH_TOKEN=%q\n", cfg.AuthToken))
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_AUTH_TOKEN=%s\n", utils.ShellQuote(cfg.AuthToken)))
 	}
 	if cfg.BaseURL != "" {
-		buf.WriteString(fmt.Sprintf("export ANTHROPIC_BASE_URL=%q\n", cfg.BaseURL))
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_BASE_URL=%s\n", utils.ShellQuote(cfg.BaseURL)))
 	}
 	if cfg.Model != "" {
-		buf.WriteString(fmt.Sprintf("export ANTHROPIC_MODEL=%q\n", cfg.Model))
+		buf.WriteString(fmt.Sprintf("export ANTHROPIC_MODEL=%s\n", utils.ShellQuote(cfg.Model)))
 	}
-	buf.WriteString(fmt.Sprintf("export APIMGR_ACTIVE=%q\n", cfg.Alias))
+	buf.WriteString(fmt.Sprintf("export APIMGR_ACTIVE=%s\n", utils.ShellQuote(cfg.Alias)))
 
 	return buf.String()
 }

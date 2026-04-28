@@ -49,7 +49,6 @@ func (b *AnthropicRequestBuilder) GetEndpoint() string {
 	return "/v1/messages"
 }
 
-
 // GetHeaders returns the headers required for Anthropic API requests
 func (b *AnthropicRequestBuilder) GetHeaders() map[string]string {
 	headers := map[string]string{

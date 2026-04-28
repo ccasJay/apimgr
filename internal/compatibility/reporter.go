@@ -81,7 +81,6 @@ func (r *Reporter) Report(result *TestResult) error {
 	return r.reportText(result)
 }
 
-
 // ReportWithVerbose outputs the test result with optional verbose data.
 func (r *Reporter) ReportWithVerbose(result *TestResult, verboseData *VerboseData) error {
 	if r.jsonOutput {
@@ -99,21 +98,21 @@ func (r *Reporter) reportJSON(result *TestResult) error {
 // reportJSONWithVerbose outputs the result in JSON format with verbose data
 func (r *Reporter) reportJSONWithVerbose(result *TestResult, verboseData *VerboseData) error {
 	output := r.buildDiagnosticOutput(result)
-	
+
 	// Create extended output with verbose data
 	type ExtendedOutput struct {
 		DiagnosticOutput
 		Verbose *VerboseData `json:"verbose,omitempty"`
 	}
-	
+
 	extOutput := ExtendedOutput{
 		DiagnosticOutput: output,
 	}
-	
+
 	if r.verbose && verboseData != nil {
 		extOutput.Verbose = verboseData
 	}
-	
+
 	return r.writeJSON(extOutput)
 }
 
@@ -157,12 +156,12 @@ func (r *Reporter) reportTextWithVerbose(result *TestResult, verboseData *Verbos
 	sb.WriteString(fmt.Sprintf("  Connection:     %s\n", r.getConnectionStatusText(result)))
 	sb.WriteString(fmt.Sprintf("  Authentication: %s\n", r.getAuthenticationStatusText(result)))
 	sb.WriteString(fmt.Sprintf("  Response Format: %s\n", r.getResponseFormatText(result)))
-	
+
 	streamingSupport := r.getStreamingSupport(result)
 	if streamingSupport != "" {
 		sb.WriteString(fmt.Sprintf("  Streaming:      %s\n", streamingSupport))
 	}
-	
+
 	sb.WriteString(fmt.Sprintf("  Response Time:  %dms\n", result.ResponseTime.Milliseconds()))
 	sb.WriteString("\n")
 
@@ -203,7 +202,6 @@ func (r *Reporter) reportTextWithVerbose(result *TestResult, verboseData *Verbos
 	_, err := r.writer.Write([]byte(sb.String()))
 	return err
 }
-
 
 // getCompatibilityVerdict returns the main verdict message with emoji
 func (r *Reporter) getCompatibilityVerdict(result *TestResult) string {

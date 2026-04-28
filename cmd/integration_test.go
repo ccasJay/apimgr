@@ -240,7 +240,6 @@ func TestIntegrationEndToEndLocalMode(t *testing.T) {
 	}
 }
 
-
 // TestIntegrationMultiTerminalIsolation tests that local mode in one terminal
 // doesn't affect other terminals
 // Task 8.2: Multi-terminal isolation test
@@ -275,7 +274,7 @@ func TestIntegrationMultiTerminalIsolation(t *testing.T) {
 
 	// Step 1: Terminal 1 executes switch -l
 	terminal1PID := "11111"
-	
+
 	// Create session marker for terminal 1
 	marker1Path := filepath.Join(configDir, "session-"+terminal1PID)
 	marker1 := session.SessionMarker{
@@ -295,13 +294,13 @@ func TestIntegrationMultiTerminalIsolation(t *testing.T) {
 
 	// Step 2: Terminal 2 opens and executes load-active
 	// load-active should detect active sessions and restore Claude Code to global
-	
+
 	// Check for active sessions (simulating HasActiveLocalSessions)
 	entries, err := os.ReadDir(configDir)
 	if err != nil {
 		t.Fatalf("Failed to read config dir: %v", err)
 	}
-	
+
 	hasActiveSessions := false
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), "session-") {
@@ -338,13 +337,13 @@ func TestIntegrationMultiTerminalIsolation(t *testing.T) {
 
 	// Step 4: Terminal 3 opens and executes load-active
 	// No active sessions now, should keep global config
-	
+
 	// Check for active sessions again
 	entries, err = os.ReadDir(configDir)
 	if err != nil {
 		t.Fatalf("Failed to read config dir: %v", err)
 	}
-	
+
 	hasActiveSessions = false
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), "session-") {
@@ -495,7 +494,7 @@ export APIMGR_ACTIVE="new-alias"
 // TestIntegrationSwitchCommandOutput tests the actual switch command output format
 func TestIntegrationSwitchCommandOutput(t *testing.T) {
 	// Test that the switch command output format is correct for shell eval
-	
+
 	// Expected output format for local mode:
 	// trap 'apimgr cleanup-session <pid>' EXIT
 	// unset ANTHROPIC_API_KEY
@@ -631,7 +630,7 @@ func TestIntegrationStaleSessionCleanup(t *testing.T) {
 
 	// Simulate HasActiveLocalSessions which should clean up stale sessions
 	// The actual implementation checks if PIDs are running and removes stale ones
-	
+
 	// For this test, we manually verify the cleanup logic
 	// In the real implementation, HasActiveLocalSessions would:
 	// 1. List all session-* files
@@ -640,7 +639,7 @@ func TestIntegrationStaleSessionCleanup(t *testing.T) {
 
 	// Since PID 999999999 is unlikely to be running, it should be cleaned up
 	// We simulate this by checking if the PID exists and removing if not
-	
+
 	// Note: In a real test with the actual binary, we would run:
 	// apimgr load-active
 	// and verify the stale session is cleaned up

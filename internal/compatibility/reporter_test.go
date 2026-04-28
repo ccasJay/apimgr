@@ -68,7 +68,6 @@ func TestProperty6_OutputFormatCompleteness(t *testing.T) {
 		gen.AnyString(),
 	)
 
-
 	// Property: JSON output contains all required diagnostic fields
 	properties.Property("JSON output contains all required diagnostic fields", prop.ForAll(
 		func(standardChecks []CheckResult, additionalChecks []CheckResult, compatLevel string, responseTime time.Duration, errStr string) bool {
@@ -209,7 +208,6 @@ func TestProperty6_OutputFormatCompleteness(t *testing.T) {
 
 	properties.TestingRun(t)
 }
-
 
 // TestReporterTextOutput tests basic text output functionality
 func TestReporterTextOutput(t *testing.T) {

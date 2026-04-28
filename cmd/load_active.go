@@ -42,34 +42,13 @@ var loadActiveCmd = &cobra.Command{
 		apiConfig, err := configManager.GetActive()
 		if err != nil {
 			// If no active config, output unset commands to clear any stale env vars
-			fmt.Println("unset ANTHROPIC_API_KEY")
-			fmt.Println("unset ANTHROPIC_AUTH_TOKEN")
-			fmt.Println("unset ANTHROPIC_BASE_URL")
-			fmt.Println("unset ANTHROPIC_MODEL")
-			fmt.Println("unset APIMGR_ACTIVE")
+			writeShellUnsets(os.Stdout)
 			return nil
 		}
 
 		// Output unset commands first to clear any stale env vars
-		fmt.Println("unset ANTHROPIC_API_KEY")
-		fmt.Println("unset ANTHROPIC_AUTH_TOKEN")
-		fmt.Println("unset ANTHROPIC_BASE_URL")
-		fmt.Println("unset ANTHROPIC_MODEL")
-		fmt.Println("unset APIMGR_ACTIVE")
-
-		// Export environment variables for the global active configuration
-		if apiConfig.APIKey != "" {
-			fmt.Printf("export ANTHROPIC_API_KEY=\"%s\"\n", apiConfig.APIKey)
-		} else if apiConfig.AuthToken != "" {
-			fmt.Printf("export ANTHROPIC_AUTH_TOKEN=\"%s\"\n", apiConfig.AuthToken)
-		}
-		if apiConfig.BaseURL != "" {
-			fmt.Printf("export ANTHROPIC_BASE_URL=\"%s\"\n", apiConfig.BaseURL)
-		}
-		if apiConfig.Model != "" {
-			fmt.Printf("export ANTHROPIC_MODEL=\"%s\"\n", apiConfig.Model)
-		}
-		fmt.Printf("export APIMGR_ACTIVE=\"%s\"\n", apiConfig.Alias)
+		writeShellUnsets(os.Stdout)
+		writeShellExports(os.Stdout, apiConfig, apiConfig.Alias)
 		return nil
 	},
 }

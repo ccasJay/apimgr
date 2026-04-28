@@ -22,10 +22,10 @@ func TestProperty9_ResultReportingBasedOnCheckOutcomes(t *testing.T) {
 
 	// Generator for a single CheckResult
 	checkResultGen := gopter.CombineGens(
-		gen.Bool(),                                                  // Passed
-		gen.Bool(),                                                  // Critical
-		gen.AnyString(),                                             // Name
-		gen.AnyString(),                                             // Message
+		gen.Bool(),      // Passed
+		gen.Bool(),      // Critical
+		gen.AnyString(), // Name
+		gen.AnyString(), // Message
 	).Map(func(values []interface{}) CheckResult {
 		return CheckResult{
 			Passed:   values[0].(bool),

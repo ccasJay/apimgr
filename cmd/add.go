@@ -107,6 +107,15 @@ func (b *APIConfigBuilder) validate() error {
 // InputCollector is responsible for collecting user input
 type InputCollector struct{}
 
+// InteractiveDefaults carries values already provided through flags.
+type InteractiveDefaults struct {
+	APIKey    string
+	AuthToken string
+	BaseURL   string
+	Model     string
+	Models    []string
+}
+
 // isTerminal checks if running in a real terminal
 func isTerminal() bool {
 	stat, err := os.Stdin.Stat()
@@ -117,29 +126,19 @@ func isTerminal() bool {
 }
 
 // CollectInteractively collects input interactively
-func (ic *InputCollector) CollectInteractively(presetType string) (*models.APIConfig, error) {
+func (ic *InputCollector) CollectInteractively(defaults InteractiveDefaults) (*models.APIConfig, error) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("Enter config alias: ")
 	alias, _ := reader.ReadString('\n')
 	alias = strings.TrimSpace(alias)
 
-	var apiKey, authToken, url, model string
+	apiKey := defaults.APIKey
+	authToken := defaults.AuthToken
+	url := defaults.BaseURL
+	model := defaults.Model
 
-	// Handle based on preset type
-	switch presetType {
-	case "api_key":
-		// API key was provided via command line
-		fmt.Print("Enter auth token (optional): ")
-		authToken, _ = reader.ReadString('\n')
-		authToken = strings.TrimSpace(authToken)
-	case "auth_token":
-		// Auth token was provided via command line
-		fmt.Print("Enter API key (optional): ")
-		apiKey, _ = reader.ReadString('\n')
-		apiKey = strings.TrimSpace(apiKey)
-	default:
-		// Fully interactive
+	if apiKey == "" && authToken == "" {
 		fmt.Print("Enter API key (optional, either api_key or auth_token is required): ")
 		apiKey, _ = reader.ReadString('\n')
 		apiKey = strings.TrimSpace(apiKey)
@@ -154,16 +153,20 @@ func (ic *InputCollector) CollectInteractively(presetType string) (*models.APICo
 		return nil, fmt.Errorf("must provide either API key or auth token")
 	}
 
-	fmt.Print("Enter API base URL (optional, default https://api.anthropic.com): ")
-	url, _ = reader.ReadString('\n')
-	url = strings.TrimSpace(url)
 	if url == "" {
-		url = "https://api.anthropic.com"
+		fmt.Print("Enter API base URL (optional, default https://api.anthropic.com): ")
+		url, _ = reader.ReadString('\n')
+		url = strings.TrimSpace(url)
+		if url == "" {
+			url = "https://api.anthropic.com"
+		}
 	}
 
-	fmt.Print("Enter model name (optional): ")
-	model, _ = reader.ReadString('\n')
-	model = strings.TrimSpace(model)
+	if model == "" {
+		fmt.Print("Enter model name (optional): ")
+		model, _ = reader.ReadString('\n')
+		model = strings.TrimSpace(model)
+	}
 
 	// Use builder to create config
 	builder := NewAPIConfigBuilder().
@@ -171,7 +174,8 @@ func (ic *InputCollector) CollectInteractively(presetType string) (*models.APICo
 		SetAPIKey(apiKey).
 		SetAuthToken(authToken).
 		SetBaseURL(url).
-		SetModel(model)
+		SetModel(model).
+		SetModels(defaults.Models)
 
 	return builder.Build()
 }
@@ -293,13 +297,6 @@ var addCmd = &cobra.Command{
 
 		case hasSK || hasAK:
 			// Preset mode - has preset parameters but no alias, enter interactive
-			presetType := ""
-			if hasSK {
-				presetType = "api_key"
-			} else {
-				presetType = "auth_token"
-			}
-
 			if !isTerminal() {
 				fmt.Println("❌ Interactive input is not supported in the current environment, please provide an alias:")
 				fmt.Printf("  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]\n",
@@ -307,7 +304,47 @@ var addCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			cfg, err = collector.CollectInteractively(presetType)
+			apiKey, _ := cmd.Flags().GetString("sk")
+			authToken, _ := cmd.Flags().GetString("ak")
+			url, _ := cmd.Flags().GetString("url")
+			model, _ := cmd.Flags().GetString("model")
+			modelsStr, _ := cmd.Flags().GetString("models")
+			hasModel := cmd.Flags().Lookup("model").Changed
+			hasModels := cmd.Flags().Lookup("models").Changed
+
+			var models []string
+			if hasModels {
+				models = parseModelsList(modelsStr)
+				if len(models) == 0 {
+					fmt.Println("❌ Error: --models list cannot be empty")
+					os.Exit(1)
+				}
+			}
+			switch {
+			case hasModel && hasModels:
+				modelInList := false
+				for _, m := range models {
+					if m == model {
+						modelInList = true
+						break
+					}
+				}
+				if !modelInList {
+					models = append([]string{model}, models...)
+				}
+			case hasModels && !hasModel:
+				model = models[0]
+			case hasModel && !hasModels:
+				models = []string{model}
+			}
+
+			cfg, err = collector.CollectInteractively(InteractiveDefaults{
+				APIKey:    apiKey,
+				AuthToken: authToken,
+				BaseURL:   url,
+				Model:     model,
+				Models:    models,
+			})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -321,7 +358,7 @@ var addCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			cfg, err = collector.CollectInteractively("")
+			cfg, err = collector.CollectInteractively(InteractiveDefaults{})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)

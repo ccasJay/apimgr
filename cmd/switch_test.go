@@ -251,7 +251,6 @@ func TestPropertyLocalModeEnvironmentVariables(t *testing.T) {
 	}
 }
 
-
 // Feature: switch-local-mode-fix, Property 2: Local mode preserves global active field
 // Validates: Requirements 1.2, 5.1
 // For any valid alias and any initial global config file state, executing `apimgr switch -l <alias>`
@@ -515,7 +514,6 @@ func TestPropertyLocalModeInvalidAlias(t *testing.T) {
 		t.Errorf("Property test failed: %v", err)
 	}
 }
-
 
 // Feature: switch-local-mode-fix, Property 8: Global mode updates active field
 // Validates: Requirements 3.1

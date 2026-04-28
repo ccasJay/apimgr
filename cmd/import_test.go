@@ -14,34 +14,34 @@ import (
 
 func TestMaskCredential(t *testing.T) {
 	tests := []struct {
-		name     string
+		name       string
 		credential string
-		expected  string
+		expected   string
 	}{
 		{
-			name:     "long credential",
+			name:       "long credential",
 			credential: "sk-ant-api03-very-long-key-here-123456789",
-			expected:  "sk-a...6789",
+			expected:   "sk-a...6789",
 		},
 		{
-			name:     "exact 8 characters",
+			name:       "exact 8 characters",
 			credential: "12345678",
-			expected:  "********",
+			expected:   "********",
 		},
 		{
-			name:     "short credential",
+			name:       "short credential",
 			credential: "short",
-			expected:  "********",
+			expected:   "********",
 		},
 		{
-			name:     "empty credential",
+			name:       "empty credential",
 			credential: "",
-			expected:  "********",
+			expected:   "********",
 		},
 		{
-			name:     "just over 8 characters",
+			name:       "just over 8 characters",
 			credential: "123456789",
-			expected:  "1234...6789",
+			expected:   "1234...6789",
 		},
 	}
 
@@ -64,8 +64,8 @@ func TestFindConflicts(t *testing.T) {
 	}
 
 	existingMap := map[string]bool{
-		"config-1": true,
-		"config-3": true,
+		"config-1":      true,
+		"config-3":      true,
 		"existing-only": true,
 	}
 
@@ -161,14 +161,14 @@ func TestImportConfigsSkipMode(t *testing.T) {
 
 	// Add an existing config
 	existingCfg := models.APIConfig{
-		Alias:     "existing-config",
-		Provider:  "anthropic",
-		APIKey:    "sk-old-key",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus"},
+		Alias:    "existing-config",
+		Provider: "anthropic",
+		APIKey:   "sk-old-key",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus"},
 	}
-err := cm.Add(existingCfg)
+	err := cm.Add(existingCfg)
 	require.NoError(t, err)
 
 	export := &crypto.ExportFormat{
@@ -223,12 +223,12 @@ func TestImportConfigsOverwriteMode(t *testing.T) {
 
 	// Add an existing config
 	existingCfg := models.APIConfig{
-		Alias:     "existing-config",
-		Provider:  "anthropic",
-		APIKey:    "sk-old-key",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus"},
+		Alias:    "existing-config",
+		Provider: "anthropic",
+		APIKey:   "sk-old-key",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus"},
 	}
 	err := cm.Add(existingCfg)
 	require.NoError(t, err)
@@ -274,12 +274,12 @@ func TestImportConfigsDefaultMode(t *testing.T) {
 
 	// Add an existing config
 	existingCfg := models.APIConfig{
-		Alias:     "existing-config",
-		Provider:  "anthropic",
-		APIKey:    "sk-old-key",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus"},
+		Alias:    "existing-config",
+		Provider: "anthropic",
+		APIKey:   "sk-old-key",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus"},
 	}
 	err := cm.Add(existingCfg)
 	require.NoError(t, err)
@@ -473,12 +473,12 @@ func TestExportImportRoundTrip(t *testing.T) {
 	defer cleanupExport()
 
 	testCfg := models.APIConfig{
-		Alias:     "roundtrip-test",
-		Provider:  "anthropic",
-		APIKey:    "sk-roundtrip-test",
-		BaseURL:   "https://api.anthropic.com",
-		Model:     "claude-3-opus",
-		Models:    []string{"claude-3-opus", "claude-3-sonnet"},
+		Alias:    "roundtrip-test",
+		Provider: "anthropic",
+		APIKey:   "sk-roundtrip-test",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-3-opus",
+		Models:   []string{"claude-3-opus", "claude-3-sonnet"},
 	}
 	err := cmExport.Add(testCfg)
 	require.NoError(t, err)

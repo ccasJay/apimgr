@@ -50,7 +50,7 @@ func deriveKey() ([]byte, error) {
 
 	// Create a machine-specific seed with multiple factors
 	seed := fmt.Sprintf("%s-%s-apimgr-encryption-key-v1", homeDir, hostname)
-	
+
 	// Generate a 32-byte key using SHA-256
 	hash := sha256.Sum256([]byte(seed))
 	return hash[:], nil
@@ -81,7 +81,7 @@ func (km *KeyManager) Encrypt(plaintext string) (string, error) {
 
 	// Encrypt the data
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	
+
 	// Encode to base64 and add prefix for identification
 	return EncryptedPrefix + base64.StdEncoding.EncodeToString(ciphertext), nil
 }
@@ -134,19 +134,19 @@ func IsEncrypted(value string) bool {
 	if value == "" {
 		return false
 	}
-	
+
 	// Check for the encryption prefix
 	if !strings.HasPrefix(value, EncryptedPrefix) {
 		return false
 	}
-	
+
 	// Verify the base64 part is valid
 	data := strings.TrimPrefix(value, EncryptedPrefix)
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return false
 	}
-	
+
 	// Encrypted data should have at least nonce + some ciphertext
 	// AES-GCM nonce is 12 bytes, plus at least some encrypted data
 	return len(decoded) >= 20
@@ -165,7 +165,7 @@ func GetOrCreateKeyFile() (string, error) {
 	}
 
 	keyFile := filepath.Join(keyDir, ".master.key")
-	
+
 	// Check if key file exists
 	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
 		// Generate a new key
@@ -173,12 +173,12 @@ func GetOrCreateKeyFile() (string, error) {
 		if _, err := rand.Read(key); err != nil {
 			return "", fmt.Errorf("failed to generate key: %w", err)
 		}
-		
+
 		// Write key to file with restricted permissions
 		if err := os.WriteFile(keyFile, key, 0600); err != nil {
 			return "", fmt.Errorf("failed to write key file: %w", err)
 		}
 	}
-	
+
 	return keyFile, nil
 }

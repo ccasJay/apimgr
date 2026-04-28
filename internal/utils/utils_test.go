@@ -102,7 +102,6 @@ func BenchmarkMaskAPIKey(b *testing.B) {
 	}
 }
 
-
 // TestValidateURL tests the ValidateURL function with various URL formats
 func TestValidateURL(t *testing.T) {
 	tests := []struct {

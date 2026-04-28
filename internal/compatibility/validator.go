@@ -17,13 +17,13 @@ type ResponseValidator interface {
 
 // AnthropicResponse represents the expected Anthropic Messages API response structure
 type AnthropicResponse struct {
-	ID         string                   `json:"id"`
-	Type       string                   `json:"type"`
-	Role       string                   `json:"role"`
-	Content    []AnthropicContentBlock  `json:"content"`
-	Model      string                   `json:"model"`
-	StopReason string                   `json:"stop_reason"`
-	Usage      *AnthropicUsage          `json:"usage"`
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Role       string                  `json:"role"`
+	Content    []AnthropicContentBlock `json:"content"`
+	Model      string                  `json:"model"`
+	StopReason string                  `json:"stop_reason"`
+	Usage      *AnthropicUsage         `json:"usage"`
 }
 
 // AnthropicContentBlock represents a content block in Anthropic response
@@ -45,7 +45,6 @@ type AnthropicValidator struct{}
 func NewAnthropicValidator() *AnthropicValidator {
 	return &AnthropicValidator{}
 }
-
 
 // ValidateBasicResponse validates a non-streaming Anthropic response
 func (v *AnthropicValidator) ValidateBasicResponse(body []byte) (*ValidationResult, error) {
@@ -70,7 +69,7 @@ func (v *AnthropicValidator) ValidateBasicResponse(body []byte) (*ValidationResu
 			for i, block := range contentArr {
 				if blockMap, isMap := block.(map[string]interface{}); isMap {
 					if _, hasType := blockMap["type"]; !hasType {
-						result.MissingFields = append(result.MissingFields, 
+						result.MissingFields = append(result.MissingFields,
 							"content["+string(rune('0'+i))+"].type")
 					}
 				}
@@ -126,7 +125,6 @@ func (v *AnthropicValidator) ValidateStreamingResponse(reader io.Reader) (*Valid
 		HasContent: true,
 	}, nil
 }
-
 
 // OpenAIResponse represents the expected OpenAI Chat Completions API response structure
 type OpenAIResponse struct {

@@ -12,9 +12,9 @@ import (
 
 // SyncOptions provides options for synchronization
 type SyncOptions struct {
-	DryRun        bool  // 仅验证，不写入
-	CreateBackup  bool  // 更新前创建备份
-	PreserveOther bool  // 保留非 ANTHROPIC 环境变量
+	DryRun        bool // 仅验证，不写入
+	CreateBackup  bool // 更新前创建备份
+	PreserveOther bool // 保留非 ANTHROPIC 环境变量
 }
 
 // UpdateEnvField updates the env field in Claude Code configuration JSON

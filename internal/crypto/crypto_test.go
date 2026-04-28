@@ -63,7 +63,7 @@ func TestKeyManager(t *testing.T) {
 
 	t.Run("Different encryptions of same plaintext", func(t *testing.T) {
 		plaintext := "test-fake-key-test"
-		
+
 		encrypted1, err := km.Encrypt(plaintext)
 		if err != nil {
 			t.Fatalf("First encryption failed: %v", err)
@@ -194,7 +194,7 @@ func TestKeyManagerConsistency(t *testing.T) {
 	}
 
 	plaintext := "test-fake-key-consistency-test"
-	
+
 	// Encrypt with first manager
 	encrypted, err := km1.Encrypt(plaintext)
 	if err != nil {

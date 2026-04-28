@@ -37,7 +37,7 @@ func lockFileShared(f *os.File) error {
 // lockWithTimeout attempts to acquire a lock with timeout to prevent blocking
 func lockWithTimeout(f *os.File, flags uintptr) error {
 	deadline := time.Now().Add(lockTimeout)
-	
+
 	for {
 		var overlapped syscall.Overlapped
 		// Use LOCKFILE_FAIL_IMMEDIATELY for non-blocking attempt
@@ -49,19 +49,19 @@ func lockWithTimeout(f *os.File, flags uintptr) error {
 			0,
 			uintptr(unsafe.Pointer(&overlapped)),
 		)
-		
+
 		if r1 != 0 {
 			return nil
 		}
-		
+
 		// Check timeout
 		if time.Now().After(deadline) {
 			return fmt.Errorf("lock timeout: file is locked by another process")
 		}
-		
+
 		// Wait before retry
 		time.Sleep(lockRetryDelay)
-		
+
 		// Ignore the error from Call, we'll retry
 		_ = err
 	}
