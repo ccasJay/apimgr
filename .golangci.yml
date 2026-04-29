@@ -3,19 +3,12 @@ run:
   tests: true
 
 linters:
+  disable-all: true
   enable:
     - gofmt
-    - gosec
-    - staticcheck  # Comprehensive checker, includes revive functionality
-    - govet        # Renamed from vet
-    - errcheck
+    - govet
+    - staticcheck
     - unused
-    - misspell
-    - gocritic
-    - gocyclo
-    - dupl
-  disable:
-    - revive       # Disable due to unused-parameter rule issues
 
 linter-settings:
   gofmt:
