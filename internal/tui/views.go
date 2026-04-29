@@ -35,9 +35,6 @@ var (
 	dimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
 
-	statusBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
-
 	messageStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42"))
 

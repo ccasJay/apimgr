@@ -158,19 +158,6 @@ func (cm *Manager) loadConfigFileLocked() (*models.File, error) {
 	return &configFile, nil
 }
 
-// saveConfigFile saves the config file with exclusive locking.
-func (cm *Manager) saveConfigFile(configFile *models.File) error {
-	lockFile, err := cm.openConfigLock(true)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = cm.closeConfigLock(lockFile)
-	}()
-
-	return cm.saveConfigFileLocked(configFile)
-}
-
 func (cm *Manager) saveConfigFileLocked(configFile *models.File) error {
 	data, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
@@ -664,11 +651,8 @@ func (cm *Manager) generateActiveScript() error {
 		return err
 	}
 
-	// Sync to global Claude Code settings (optional feature, doesn't affect main flow)
-	if syncErr := cm.SyncClaudeSettingsOnly(active); syncErr != nil {
-		// Silently ignore error in TUI mode or log to file if logger is available
-		// fmt.Printf("⚠️  Failed to sync to global Claude Code settings: %v\n", syncErr)
-	}
+	// Sync to Claude Code settings as a best-effort side effect.
+	_ = cm.SyncClaudeSettingsOnly(active)
 
 	return nil
 }

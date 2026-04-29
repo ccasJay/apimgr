@@ -66,10 +66,7 @@ func AtomicFileUpdate(filePath string, newContent string, createBackup bool) err
 	// Cleanup old backups after successful update
 	if createBackup {
 		bm := NewBackupManager(DefaultBackupRetention)
-		if err := bm.CleanupOldBackups(filePath); err != nil {
-			// Non-fatal error, update was successful
-			// fmt.Printf("⚠️  Failed to cleanup old backups: %v\n", err)
-		}
+		_ = bm.CleanupOldBackups(filePath)
 	}
 
 	return nil

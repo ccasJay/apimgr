@@ -11,28 +11,6 @@ import (
 	"github.com/ccasJay/apimgr/config/validation"
 )
 
-// Helper function to create a temporary config file
-func createTempConfigFile(t *testing.T, content string) (string, func()) {
-	t.Helper()
-
-	tmpfile, err := os.CreateTemp("", "config_test_*.json")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-
-	if _, err := tmpfile.Write([]byte(content)); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
-	}
-
-	if err := tmpfile.Close(); err != nil {
-		t.Fatalf("Failed to close temp file: %v", err)
-	}
-
-	return tmpfile.Name(), func() {
-		os.Remove(tmpfile.Name())
-	}
-}
-
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string

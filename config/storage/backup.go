@@ -178,9 +178,3 @@ func copyFile(src, dst string) error {
 	}
 	return os.Chmod(dst, srcInfo.Mode())
 }
-
-// restoreFromBackup restores a file from its most recent backup (legacy wrapper for backward compatibility)
-func restoreFromBackup(filePath string) error {
-	bm := NewBackupManager(DefaultBackupRetention)
-	return bm.RestoreFromLatestBackup(filePath)
-}

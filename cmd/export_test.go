@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 
 	"github.com/ccasJay/apimgr/config"
@@ -249,19 +248,16 @@ func mockExportConfigManager(t *testing.T) (*config.Manager, func()) {
 
 	// Create a temp directory for config
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("APIMGR_CONFIG_DIR", tempDir)
+	t.Setenv("USERPROFILE", tempDir)
 
 	// Create config manager
 	cm, err := config.NewConfigManager()
 	require.NoError(t, err)
 
-	// Cleanup function
-	cleanup := func() {
-		os.Setenv("HOME", oldHome)
-	}
-
-	return cm, cleanup
+	return cm, func() {}
 }
 
 func TestExportIntegration(t *testing.T) {

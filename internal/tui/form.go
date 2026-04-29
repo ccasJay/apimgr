@@ -77,9 +77,6 @@ var (
 			Foreground(lipgloss.Color("241")).
 			Width(14)
 
-	formInputStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252"))
-
 	formFocusedStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("205")).
 				Bold(true)

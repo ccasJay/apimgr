@@ -1351,10 +1351,8 @@ func switchModelAndSync(cm *config.Manager, alias string, model string, isLocal 
 				}
 			}
 
-			// Generate active script
-			if genErr := cm.GenerateActiveScript(); genErr != nil {
-				// Continue even if script generation fails
-			}
+			// Generate active script as a best-effort side effect.
+			_ = cm.GenerateActiveScript()
 
 			return ModelSwitchedMsg{
 				Alias:    alias,
