@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"apimgr/config/models"
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/utils"
 )
 
 // GenerateEnvScript generates environment variable script content

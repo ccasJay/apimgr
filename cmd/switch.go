@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"apimgr/config"
-	"apimgr/config/session"
-	"apimgr/config/validation"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/session"
+	"github.com/ccasJay/apimgr/config/validation"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +29,7 @@ var switchCmd = &cobra.Command{
 
 To make environment variables effective in current shell, there are two methods:
 1. Using eval: eval "$(apimgr switch <alias>)"
-2. Install shell integration: apimgr install (recommended, allows direct use of apimgr switch after installation)
+2. Install shell integration: apimgr shell-install (recommended, allows direct use of apimgr switch after installation)
 
 Using -l/--local parameter switches configuration only in current shell session without modifying global configuration:
   apimgr switch -l <alias>

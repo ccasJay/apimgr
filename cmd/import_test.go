@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"apimgr/config"
-	"apimgr/config/models"
-	"apimgr/internal/crypto"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/crypto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

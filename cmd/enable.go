@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"apimgr/config"
+	"github.com/ccasJay/apimgr/config"
 	"github.com/spf13/cobra"
 )
 

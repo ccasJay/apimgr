@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"apimgr/config"
-	"apimgr/config/models"
-	"apimgr/internal/compatibility"
-	"apimgr/internal/providers"
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/compatibility"
+	"github.com/ccasJay/apimgr/internal/providers"
+	"github.com/ccasJay/apimgr/internal/utils"
 	"github.com/spf13/cobra"
 )
 

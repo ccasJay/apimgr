@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/internal/utils"
 )
 
 // InputValidator validates user input

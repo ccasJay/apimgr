@@ -16,7 +16,7 @@ If you find a bug or have a feature request, please submit it through GitHub Iss
 
 ### 2. Submit Pull Requests
 1. **Fork the repository**
-2. **Clone your fork**: `git clone https://github.com/your-username/apimgr.git`
+2. **Clone your fork**: `git clone https://github.com/ccasJay/apimgr.git`
 3. **Create a branch**: `git checkout -b feature/your-feature-name`
 4. **Implement changes**: Write code following the project's coding style
 5. **Run tests**: `go test ./...`
@@ -50,7 +50,7 @@ Please follow the [Contributor Covenant](https://www.contributor-covenant.org/ve
 ## Development Environment
 
 ### Dependencies
-- Go 1.21+
+- Go 1.24+
 - golangci-lint
 - goreleaser (for release)
 

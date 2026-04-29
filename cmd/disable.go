@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"apimgr/config"
+	"github.com/ccasJay/apimgr/config"
 
 	"github.com/spf13/cobra"
 )

@@ -1,4 +1,4 @@
-module apimgr
+module github.com/ccasJay/apimgr
 
 go 1.24.0
 

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"apimgr/config"
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/internal/utils"
 	"github.com/spf13/cobra"
 )
 

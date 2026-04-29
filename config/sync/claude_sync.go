@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/models"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )

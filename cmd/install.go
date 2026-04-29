@@ -15,9 +15,10 @@ var (
 )
 
 var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Install shell initialization script",
-	Long:  "Add auto-load command to shell configuration file, so new terminals automatically load active configuration",
+	Use:     "shell-install",
+	Aliases: []string{"install"},
+	Short:   "Install shell initialization script",
+	Long:    "Add auto-load command to shell configuration file, so new terminals automatically load active configuration",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Skip shell integration if flag is set
 		if noShellIntegration {
@@ -89,7 +90,7 @@ fi
 						return
 					}
 					fmt.Printf("⚠️  Detected old version installation\n")
-					fmt.Printf("Suggested to run 'apimgr install --force' to update to new version\n")
+					fmt.Printf("Suggested to run 'apimgr shell-install --force' to update to new version\n")
 					fmt.Printf("Or manually update apimgr configuration in %s\n", rcFile)
 					return
 				}

@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"apimgr/config"
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/models"
 	"github.com/spf13/cobra"
 )
 

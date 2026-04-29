@@ -3,8 +3,8 @@ package tui
 import (
 	"time"
 
-	"apimgr/config/models"
-	"apimgr/internal/compatibility"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/compatibility"
 )
 
 // ConfigsLoadedMsg is sent when configs are loaded

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"apimgr/config/models"
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/utils"
 )
 
 func writeShellUnsets(w io.Writer) {

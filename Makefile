@@ -1,25 +1,37 @@
 # API Manager Makefile
 
+BINARY ?= apimgr
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+LDFLAGS ?= -s -w
+
+.PHONY: build install install-local install-shell upgrade uninstall run clean
+
 build:
-	CGO_ENABLED=0 go build -o apimgr .
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) .
 
 install: build
-	@echo "✅ apimgr in project directory has been updated"
-	@echo "To install system-wide, run in Terminal: sudo cp apimgr /usr/local/bin/apimgr"
+	install -d "$(DESTDIR)$(BINDIR)"
+	install -m 0755 "$(BINARY)" "$(DESTDIR)$(BINDIR)/$(BINARY)"
+	@echo "✅ $(BINARY) installed to $(DESTDIR)$(BINDIR)/$(BINARY)"
+	@echo "Run '$(BINARY) shell-install' to enable shell integration"
 
-upgrade: build
-	@echo "✅ apimgr in project directory has been updated"
-	@echo "To install system-wide, run in Terminal: sudo cp apimgr /usr/local/bin/apimgr"
+install-local: build
+	install -d "$(HOME)/.local/bin"
+	install -m 0755 "$(BINARY)" "$(HOME)/.local/bin/$(BINARY)"
+	@echo "✅ $(BINARY) installed to $(HOME)/.local/bin/$(BINARY)"
+
+install-shell: build
+	./$(BINARY) shell-install
+
+upgrade: install
 
 uninstall:
-	sudo rm -f /usr/local/bin/apimgr
-	@echo "✅ /usr/local/bin/apimgr has been uninstalled"
+	rm -f "$(DESTDIR)$(BINDIR)/$(BINARY)"
+	@echo "✅ $(DESTDIR)$(BINDIR)/$(BINARY) has been uninstalled"
 
 run: build
-	./apimgr
+	./$(BINARY)
 
 clean:
-	rm -f apimgr
-	sudo rm -f /usr/local/bin/apimgr 2>/dev/null || true
-
-.PHONY: build install install-local uninstall run clean
+	rm -f "$(BINARY)"

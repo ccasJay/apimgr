@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config/models"
-	"apimgr/internal/providers"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/providers"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"apimgr/config"
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -104,7 +104,7 @@ var statusCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println("\n💡 Tip: Run 'apimgr install' to install shell integration for better experience")
+		fmt.Println("\n💡 Tip: Run 'apimgr shell-install' to install shell integration for better experience")
 		return nil
 	},
 }

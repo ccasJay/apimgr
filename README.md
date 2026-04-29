@@ -1,8 +1,8 @@
 # API Manager (apimgr)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/your-username/apimgr)
-[![Go Version](https://img.shields.io/badge/Go-1.21%2B-blue)](https://golang.org/)
+[![Cross-Platform](https://img.shields.io/badge/Platform-MacOS%20%7C%20Linux%20%7C%20Windows-blue)](https://github.com/ccasJay/apimgr)
+[![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue)](https://golang.org/)
 
 [中文版](README.zh.md)
 
@@ -46,12 +46,12 @@ A modern, feature-rich command-line tool for managing API configurations and tes
 ## Installation
 
 ### Prerequisites
-- Go 1.21 or higher (for source compilation)
+- Go 1.24 or higher (for source compilation)
 
 ### Recommended Installation
 #### Go Install
 ```bash
-go install https://github.com/ccasJay/apimgr.git
+go install github.com/ccasJay/apimgr@latest
 ```
 
 #### From Source
@@ -67,8 +67,9 @@ sudo mv apimgr /usr/local/bin/  # Optional: install system-wide
 git clone https://github.com/ccasJay/apimgr.git
 
 cd apimgr
-make install  # Builds and installs locally
-# sudo make install  # For system-wide installation
+make build          # Build ./apimgr
+sudo make install   # Install to /usr/local/bin
+make install-local  # Install to ~/.local/bin
 ```
 
 ## Quick Start
@@ -296,7 +297,7 @@ apimgr status  # Shows both global and local configuration
 
 ## Shell Integration
 
-Run `apimgr install` to enable shell integration for automatic configuration loading. Supported shells:
+After installing the binary, run `apimgr shell-install` to enable shell integration for automatic configuration loading. The legacy `apimgr install` alias is still supported. Supported shells:
 - Bash
 - Zsh
 - Fish
@@ -342,4 +343,4 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
-For issues, feature requests, or questions, please open an [issue](https://github.com/your-username/apimgr/issues) on GitHub.
+For issues, feature requests, or questions, please open an [issue](https://github.com/ccasJay/apimgr/issues) on GitHub.

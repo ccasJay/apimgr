@@ -33,13 +33,13 @@
 ### 方法 1: Go install (推荐)
 
 ```bash
-go install github.com/your-username/apimgr@latest
+go install github.com/ccasJay/apimgr@latest
 ```
 
 ### 方法 2: 从源码构建
 
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
 go build -o apimgr .
 
@@ -54,7 +54,10 @@ sudo mv apimgr /usr/local/bin/
 make build
 
 # 安装到系统路径
-make install
+sudo make install
+
+# 或安装到当前用户
+make install-local
 ```
 
 ## 快速开始
@@ -504,7 +507,7 @@ chmod 600 ~/.config/apimgr/config.json
 
 ## 技术架构
 
-- **语言**: Go 1.21+
+- **语言**: Go 1.24+
 - **CLI 框架**: Cobra
 - **配置格式**: JSON
 - **存储位置**: `~/.config/apimgr/` (XDG 规范)

@@ -6,36 +6,33 @@
 
 ### Method 1: Binary Download
 
-Download the appropriate binary for your system from [GitHub Releases](https://github.com/your-username/apimgr/releases).
+Download the appropriate binary for your system from [GitHub Releases](https://github.com/ccasJay/apimgr/releases).
 
 ### Method 2: Compile from Source
 
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
 go build
-mv apimgr /usr/local/bin/
+sudo mv apimgr /usr/local/bin/
 ```
 
 ### Method 3: Go Install
 
 ```bash
-go install github.com/your-username/apimgr@latest
+go install github.com/ccasJay/apimgr@latest
 ```
 
-## Initialization
+## Shell Integration
 
-Run the init command to set up the application:
+After installing the binary, enable shell integration if you want `apimgr switch` to update the current shell automatically:
 
 ```bash
-apimgr init
+apimgr shell-install
+source ~/.zshrc  # or source ~/.bashrc
 ```
 
-This will guide you through:
-
-1. Configuration directory creation
-2. Default API provider selection
-3. Shell integration setup
+The legacy `apimgr install` alias still works, but `shell-install` is the canonical command name.
 
 ## Basic Usage
 

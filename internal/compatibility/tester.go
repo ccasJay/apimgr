@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"apimgr/config/models"
-	"apimgr/internal/providers"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/providers"
 )
 
 // ProviderURLPatterns maps URL patterns to provider names for auto-detection

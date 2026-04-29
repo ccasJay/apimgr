@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"apimgr/cmd"
+	"github.com/ccasJay/apimgr/cmd"
 )
 
 // Version information (set by goreleaser)

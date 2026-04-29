@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"apimgr/config"
+	"github.com/ccasJay/apimgr/config"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

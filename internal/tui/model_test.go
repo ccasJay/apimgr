@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/models"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

@@ -3,13 +3,12 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main", "develop" ]
+    tags:
+      - "v*"
   pull_request:
     branches: [ "main", "develop" ]
-  release:
-    types: [ created ]
 
 env:
-  GO_VERSION: 1.21
   SKIP_WINDOWS_BUILD: 'true'
 
 jobs:
@@ -21,21 +20,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Install linting tools
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
       - name: Run go fmt
-        run: go fmt ./...
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "The following files need gofmt:"
+            echo "$files"
+            exit 1
+          fi
 
       - name: Run golangci-lint
-        run: |
-          golangci-lint run --timeout=5m || true
-          echo "Lint completed with warnings (non-blocking)"
+        run: golangci-lint run --timeout=5m
 
   test:
     name: Test
@@ -45,56 +48,60 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Run unit tests
-        run: go test -v -cover ./config ./internal/...
+        run: go test -v -cover ./...
 
   build:
     name: Build
     runs-on: ubuntu-latest
     needs: [ lint, test ]
-    if: github.event_name != 'release'
+    if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Build for Linux
-        run: GOOS=linux GOARCH=amd64 go build -o apimgr-linux-amd64
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o apimgr-linux-amd64
 
       - name: Build for macOS
-        run: GOOS=darwin GOARCH=amd64 go build -o apimgr-darwin-amd64
+        run: CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o apimgr-darwin-amd64
 
       - name: Build for Windows
         if: env.SKIP_WINDOWS_BUILD != 'true'
-        run: GOOS=windows GOARCH=amd64 go build -o apimgr-windows-amd64.exe
+        run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o apimgr-windows-amd64.exe
 
-      - name: Clean up
-        run: rm -f apimgr-*
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apimgr-dev-builds
+          path: apimgr-*
+          if-no-files-found: error
 
   release:
     name: Release
     runs-on: ubuntu-latest
     needs: [ lint, test ]
-    if: github.event_name == 'release'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Install goreleaser
-        run: go install github.com/goreleaser/goreleaser@latest
+        run: go install github.com/goreleaser/goreleaser@v1.26.2
 
       - name: Run goreleaser
         env:

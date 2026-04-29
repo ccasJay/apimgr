@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"apimgr/config"
-	"apimgr/config/models"
-	"apimgr/internal/crypto"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/crypto"
 	"github.com/spf13/cobra"
 )
 

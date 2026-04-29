@@ -5,33 +5,31 @@
 ## 安装
 
 ### 方法1：二进制下载
-从 [GitHub Releases](https://github.com/your-username/apimgr/releases) 下载适合您系统的二进制文件。
+从 [GitHub Releases](https://github.com/ccasJay/apimgr/releases) 下载适合您系统的二进制文件。
 
 ### 方法2：源码编译
 ```bash
-git clone https://github.com/your-username/apimgr.git
+git clone https://github.com/ccasJay/apimgr.git
 cd apimgr
 go build
-mv apimgr /usr/local/bin/
+sudo mv apimgr /usr/local/bin/
 ```
 
 ### 方法3：Go install
 ```bash
-go install github.com/your-username/apimgr@latest
+go install github.com/ccasJay/apimgr@latest
 ```
 
-## 初始化
+## Shell 集成
 
-首次使用时，运行初始化命令：
+安装二进制后，如果希望 `apimgr switch` 自动更新当前 shell 环境变量，请启用 shell 集成：
 
 ```bash
-apimgr init
+apimgr shell-install
+source ~/.zshrc  # 或 source ~/.bashrc
 ```
 
-这会引导您完成：
-1. 配置目录创建
-2. 默认API提供商选择
-3. Shell集成配置
+旧命令 `apimgr install` 仍可作为别名使用，但推荐使用 `shell-install`。
 
 ## 基本使用
 

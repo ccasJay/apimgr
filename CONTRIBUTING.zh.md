@@ -16,7 +16,7 @@
 
 ### 2. 提交 Pull Request
 1. **Fork 仓库**：点击 GitHub 页面右上角的 "Fork" 按钮
-2. **克隆仓库**：`git clone https://github.com/your-username/apimgr.git`
+2. **克隆仓库**：`git clone https://github.com/ccasJay/apimgr.git`
 3. **创建分支**：`git checkout -b feature/your-feature-name`
 4. **实现功能**：编写代码，确保符合项目的代码风格
 5. **运行测试**：`go test ./...`
@@ -50,7 +50,7 @@
 ## 开发环境
 
 ### 依赖
-- Go 1.21+
+- Go 1.24+
 - golangci-lint
 - goreleaser (用于发布)
 

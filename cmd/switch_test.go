@@ -12,8 +12,8 @@ import (
 	"testing"
 	"testing/quick"
 
-	"apimgr/config"
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/models"
 )
 
 // Helper function to create a test config file

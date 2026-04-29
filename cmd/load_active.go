@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"apimgr/config"
-	"apimgr/config/session"
+	"github.com/ccasJay/apimgr/config"
+	"github.com/ccasJay/apimgr/config/session"
 	"github.com/spf13/cobra"
 )
 

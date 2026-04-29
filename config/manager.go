@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"apimgr/config/models"
-	"apimgr/config/storage"
-	syncpkg "apimgr/config/sync"
-	"apimgr/config/validation"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/storage"
+	syncpkg "github.com/ccasJay/apimgr/config/sync"
+	"github.com/ccasJay/apimgr/config/validation"
 )
 
 // normalizeModels ensures backward compatibility for configs loaded without models field.

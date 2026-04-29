@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/models"
 )
 
 func TestShouldPrompt_单模型配置不提示(t *testing.T) {

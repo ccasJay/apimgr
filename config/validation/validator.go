@@ -1,10 +1,10 @@
 package validation
 
 import (
-	"apimgr/config/models"
-	"apimgr/internal/providers"
-	"apimgr/internal/utils"
 	"fmt"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/providers"
+	"github.com/ccasJay/apimgr/internal/utils"
 )
 
 // Validator validates API configurations

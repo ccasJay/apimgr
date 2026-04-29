@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"apimgr/config/validation"
+	"github.com/ccasJay/apimgr/config/validation"
 )
 
 func TestValidateModelInList(t *testing.T) {

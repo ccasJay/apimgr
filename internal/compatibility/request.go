@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	"apimgr/config/models"
-	"apimgr/internal/providers"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/internal/providers"
 )
 
 // RequestBuilder defines the interface for building provider-specific API requests

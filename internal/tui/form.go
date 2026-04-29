@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"apimgr/internal/utils"
+	"github.com/ccasJay/apimgr/internal/utils"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"

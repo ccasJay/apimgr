@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config/models"
-	"apimgr/config/session"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/session"
 )
 
 // Integration tests for the switch-local-mode-fix feature

@@ -9,8 +9,8 @@ import (
 	"testing/quick"
 	"time"
 
-	"apimgr/config/models"
-	"apimgr/config/session"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/session"
 )
 
 // setupTestSession creates a test config manager with a temporary directory

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"apimgr/config/models"
-	"apimgr/config/validation"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/validation"
 )
 
 // Helper function to create a temporary config file

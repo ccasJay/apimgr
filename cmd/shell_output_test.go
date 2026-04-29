@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/models"
 )
 
 func TestWriteShellExportsUsesSafeQuoting(t *testing.T) {

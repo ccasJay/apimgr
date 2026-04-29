@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/models"
 
 	"github.com/charmbracelet/lipgloss"
 )

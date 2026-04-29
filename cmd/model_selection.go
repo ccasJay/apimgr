@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"apimgr/config/models"
-	"apimgr/config/validation"
+	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/validation"
 )
 
 // ModelSelector handles interactive model selection functionality

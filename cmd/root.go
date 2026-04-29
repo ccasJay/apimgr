@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"apimgr/internal/tui"
+	"github.com/ccasJay/apimgr/internal/tui"
 
 	"github.com/spf13/cobra"
 )
