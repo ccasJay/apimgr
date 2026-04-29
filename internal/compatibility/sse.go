@@ -92,7 +92,7 @@ func (p *SSEParser) ParseEvent() (*SSEEvent, error) {
 			retryStr := strings.TrimPrefix(line, "retry:")
 			retryStr = strings.TrimPrefix(retryStr, " ")
 			_, _ = fmt.Sscanf(retryStr, "%d", &event.Retry)
-		} else if strings.HasPrefix(line, ":") {
+		} else if len(line) > 0 && line[0] == ':' {
 			// Comment line, ignore
 			continue
 		}
