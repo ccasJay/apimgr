@@ -91,7 +91,7 @@ func (p *SSEParser) ParseEvent() (*SSEEvent, error) {
 			// Parse retry as integer (ignore errors)
 			retryStr := strings.TrimPrefix(line, "retry:")
 			retryStr = strings.TrimPrefix(retryStr, " ")
-			fmt.Sscanf(retryStr, "%d", &event.Retry)
+			_, _ = fmt.Sscanf(retryStr, "%d", &event.Retry)
 		} else if strings.HasPrefix(line, ":") {
 			// Comment line, ignore
 			continue
