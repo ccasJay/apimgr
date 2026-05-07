@@ -41,9 +41,9 @@ func TestSyncSubcommands(t *testing.T) {
 		hasRun  bool
 		hasRunE bool
 	}{
-		{"status", "status", true, false},
-		{"claude", "claude", true, false},
-		{"init", "init", true, false},
+		{"status", "status", false, true},
+		{"claude", "claude", false, true},
+		{"init", "init", false, true},
 		{"list", "list", true, false},
 	}
 

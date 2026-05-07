@@ -47,11 +47,19 @@ func UpdateEnvField(originalContent string, cfg *models.APIConfig, opts SyncOpti
 		}
 	}
 
-	// Set new ANTHROPIC values (only non-empty values)
+	// Set new ANTHROPIC values with mutual exclusivity
 	if cfg.APIKey != "" {
 		updatedEnv["ANTHROPIC_API_KEY"] = cfg.APIKey
+		// Ensure auth token is not present when API key is used
+		delete(updatedEnv, "ANTHROPIC_AUTH_TOKEN")
 	} else if cfg.AuthToken != "" {
 		updatedEnv["ANTHROPIC_AUTH_TOKEN"] = cfg.AuthToken
+		// Ensure API key is not present when auth token is used
+		delete(updatedEnv, "ANTHROPIC_API_KEY")
+	} else {
+		// Both empty: remove any existing authentication environment variables
+		delete(updatedEnv, "ANTHROPIC_API_KEY")
+		delete(updatedEnv, "ANTHROPIC_AUTH_TOKEN")
 	}
 	if cfg.Model != "" {
 		updatedEnv["ANTHROPIC_MODEL"] = cfg.Model

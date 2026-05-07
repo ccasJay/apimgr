@@ -29,6 +29,12 @@ type Manager struct {
 	mu         sync.Mutex // Mutex to protect concurrent access
 }
 
+// NewConfigManagerWithPath creates a Manager with a custom config file path.
+// This is useful for testing or when the config location needs to be overridden.
+func NewConfigManagerWithPath(configPath string) *Manager {
+	return &Manager{configPath: configPath}
+}
+
 // NewConfigManager creates a new Manager with unified config path
 func NewConfigManager() (*Manager, error) {
 	homeDir, err := os.UserHomeDir()
@@ -419,17 +425,15 @@ func (cm *Manager) UpdatePartial(alias string, updates map[string]string) error 
 		for i, config := range configFile.Configs {
 			if config.Alias == alias {
 				// Update only the fields that are provided
-				if apiKey, ok := updates["api_key"]; ok {
-					configFile.Configs[i].APIKey = apiKey
-					if apiKey != "" {
-						configFile.Configs[i].AuthToken = "" // Clear auth token
-					}
+				if _, ok := updates["api_key"]; ok {
+					configFile.Configs[i].APIKey = updates["api_key"]
+					// Always clear auth token when api_key is updated (even if empty)
+					configFile.Configs[i].AuthToken = ""
 				}
-				if authToken, ok := updates["auth_token"]; ok {
-					configFile.Configs[i].AuthToken = authToken
-					if authToken != "" {
-						configFile.Configs[i].APIKey = "" // Clear API key
-					}
+				if _, ok := updates["auth_token"]; ok {
+					configFile.Configs[i].AuthToken = updates["auth_token"]
+					// Always clear api key when auth_token is updated (even if empty)
+					configFile.Configs[i].APIKey = ""
 				}
 				if baseURL, ok := updates["base_url"]; ok {
 					configFile.Configs[i].BaseURL = baseURL

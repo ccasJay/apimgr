@@ -38,7 +38,7 @@ var syncStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "View sync status",
 	Long:  `View current configuration sync status to various tools`,
-	Run:   runSyncStatus,
+	RunE:  runSyncStatusE,
 }
 
 func init() {
@@ -50,7 +50,7 @@ var syncClaudeCmd = &cobra.Command{
 	Use:   "claude",
 	Short: "Sync to Claude Code",
 	Long:  `Force sync current active configuration to Claude Code`,
-	Run:   runSyncClaude,
+	RunE:  runSyncClaudeE,
 }
 
 func init() {
@@ -62,7 +62,7 @@ var syncInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize tool configuration files for project",
 	Long:  `Create configuration file templates for various tools in the current project directory`,
-	Run:   runSyncInit,
+	RunE:  runSyncInitE,
 }
 
 func init() {
@@ -127,40 +127,35 @@ func showSyncStatus() error {
 	return nil
 }
 
-func runSyncStatus(cmd *cobra.Command, args []string) {
-	if err := showSyncStatus(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	}
+func runSyncStatusE(cmd *cobra.Command, args []string) error {
+	return showSyncStatus()
 }
 
-func runSyncClaude(cmd *cobra.Command, args []string) {
+func runSyncClaudeE(cmd *cobra.Command, args []string) error {
 	configManager, err := config.NewConfigManager()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to initialize config manager: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize config manager: %w", err)
 	}
 
 	if _, err := configManager.GetActive(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	fmt.Println("Syncing to Claude Code...")
 
 	// Sync global settings
 	if err := configManager.GenerateActiveScript(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Sync failed: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("sync failed: %w", err)
 	}
 
 	fmt.Println("\n✅ Sync completed!")
+	return nil
 }
 
-func runSyncInit(cmd *cobra.Command, args []string) {
+func runSyncInitE(cmd *cobra.Command, args []string) error {
 	workDir, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to get current directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	fmt.Println("Initializing tool configuration files for project...")
@@ -168,8 +163,7 @@ func runSyncInit(cmd *cobra.Command, args []string) {
 	// Create .claude directory (if it doesn't exist)
 	claudeDir := filepath.Join(workDir, ".claude")
 	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to create .claude directory: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create .claude directory: %w", err)
 	}
 
 	// Create Claude Code configuration file
@@ -188,8 +182,7 @@ func runSyncInit(cmd *cobra.Command, args []string) {
 		}
 
 		if err := writeJSONFile(claudeSettingsPath, settings); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to create Claude Code configuration file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to create Claude Code configuration file: %w", err)
 		}
 
 		fmt.Printf("✅ Created Claude Code configuration: %s\n", claudeSettingsPath)
@@ -199,6 +192,7 @@ func runSyncInit(cmd *cobra.Command, args []string) {
 
 	fmt.Println("\n✅ Project initialization completed!")
 	fmt.Println("\napimgr will now automatically sync configuration to this project.")
+	return nil
 }
 
 func runSyncList(cmd *cobra.Command, args []string) {

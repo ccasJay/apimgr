@@ -70,22 +70,22 @@ Examples:
 
 		// Parse flags into updates map
 		updates := make(map[string]string)
-		if aliasFlag != "" {
+		if cmd.Flags().Changed("alias") {
 			updates["alias"] = aliasFlag
 		}
-		if skFlag != "" {
+		if cmd.Flags().Changed("sk") {
 			updates["api_key"] = skFlag
 		}
-		if akFlag != "" {
+		if cmd.Flags().Changed("ak") {
 			updates["auth_token"] = akFlag
 		}
-		if urlFlag != "" {
+		if cmd.Flags().Changed("url") {
 			updates["base_url"] = urlFlag
 		}
-		if modelFlag != "" {
+		if cmd.Flags().Changed("model") {
 			updates["model"] = modelFlag
 		}
-		if modelsFlag != "" {
+		if cmd.Flags().Changed("models") {
 			updates["models"] = modelsFlag
 		}
 

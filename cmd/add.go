@@ -231,11 +231,7 @@ var addCmd = &cobra.Command{
 
 			// Validate at least one authentication method
 			if apiKey == "" && authToken == "" {
-				fmt.Println("❌ Error: Must provide either --sk or --ak parameter")
-				fmt.Println("\n💡 Usage examples:")
-				fmt.Println("  apimgr add my-config --sk sk-xxx")
-				fmt.Println("  apimgr add my-config --ak token-xxx")
-				os.Exit(1)
+				return fmt.Errorf("must provide either --sk or --ak parameter\n\nUsage examples:\n  apimgr add my-config --sk sk-xxx\n  apimgr add my-config --ak token-xxx")
 			}
 
 			// Process models list and model/models flag interaction
@@ -248,8 +244,7 @@ var addCmd = &cobra.Command{
 				models = parseModelsList(modelsStr)
 				// Validate models list is not empty
 				if len(models) == 0 {
-					fmt.Println("❌ Error: --models list cannot be empty")
-					os.Exit(1)
+					return fmt.Errorf("--models list cannot be empty")
 				}
 			}
 
@@ -291,17 +286,14 @@ var addCmd = &cobra.Command{
 
 			cfg, err = builder.Build()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("invalid configuration: %w", err)
 			}
 
 		case hasSK || hasAK:
 			// Preset mode - has preset parameters but no alias, enter interactive
 			if !isTerminal() {
-				fmt.Println("❌ Interactive input is not supported in the current environment, please provide an alias:")
-				fmt.Printf("  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]\n",
+				return fmt.Errorf("interactive input is not supported in the current environment, please provide an alias:\n  apimgr add <alias> --%s <value> [--url <url>] [--model <model>]",
 					map[bool]string{true: "sk", false: "ak"}[hasSK])
-				os.Exit(1)
 			}
 
 			apiKey, _ := cmd.Flags().GetString("sk")
@@ -316,8 +308,7 @@ var addCmd = &cobra.Command{
 			if hasModels {
 				models = parseModelsList(modelsStr)
 				if len(models) == 0 {
-					fmt.Println("❌ Error: --models list cannot be empty")
-					os.Exit(1)
+					return fmt.Errorf("--models list cannot be empty")
 				}
 			}
 			switch {
@@ -346,30 +337,24 @@ var addCmd = &cobra.Command{
 				Models:    models,
 			})
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to collect input: %w", err)
 			}
 
 		default:
 			// Fully interactive mode
 			if !isTerminal() {
-				fmt.Println("❌ Interactive input is not supported in the current environment")
-				fmt.Printf("  apimgr add <alias> --sk <key> [--url <url>] [--model <model>]\n")
-				os.Exit(1)
+				return fmt.Errorf("interactive input is not supported in the current environment\n  apimgr add <alias> --sk <key> [--url <url>] [--model <model>]")
 			}
 
 			cfg, err = collector.CollectInteractively(InteractiveDefaults{})
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to collect input: %w", err)
 			}
 		}
 
 		// Save the configuration
-		err = configManager.Add(*cfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Failed to save configuration: %v\n", err)
-			os.Exit(1)
+		if err := configManager.Add(*cfg); err != nil {
+			return fmt.Errorf("failed to save configuration: %w", err)
 		}
 
 		// Generate active script
