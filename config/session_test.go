@@ -1088,3 +1088,49 @@ func TestPropertyCleanupSessionNonExistent(t *testing.T) {
 		t.Errorf("Property test failed: %v", err)
 	}
 }
+
+func TestCreateSessionMarkerRejectsInvalidPID(t *testing.T) {
+	cm, tempDir := setupTestSession(t)
+	invalidPIDs := []string{"", "   ", "../evil", "1/../../x", "abc", "-1", "0", "001", "+1", "1\n"}
+
+	for _, pid := range invalidPIDs {
+		t.Run(strconv.Quote(pid), func(t *testing.T) {
+			err := session.CreateSessionMarker(cm.configPath, pid, "alias")
+			if err == nil {
+				t.Fatalf("CreateSessionMarker(%q) expected error, got nil", pid)
+			}
+
+			entries, err := os.ReadDir(tempDir)
+			if err != nil {
+				t.Fatalf("ReadDir() error: %v", err)
+			}
+			for _, entry := range entries {
+				if entry.Name() != "config.json" && len(entry.Name()) >= len("session-") && entry.Name()[:len("session-")] == "session-" {
+					t.Fatalf("unexpected session marker created for invalid pid %q: %s", pid, entry.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestCleanupSessionRejectsInvalidPID(t *testing.T) {
+	cm, tempDir := setupTestSession(t)
+	sentinelPath := filepath.Join(tempDir, "sentinel.txt")
+	if err := os.WriteFile(sentinelPath, []byte("keep"), 0600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	invalidPIDs := []string{"", "   ", "../evil", "1/../../x", "abc", "-1", "0", "001", "+1", "1\n"}
+	for _, pid := range invalidPIDs {
+		t.Run(strconv.Quote(pid), func(t *testing.T) {
+			err := session.CleanupSession(cm.configPath, pid)
+			if err == nil {
+				t.Fatalf("CleanupSession(%q) expected error, got nil", pid)
+			}
+
+			if _, err := os.Stat(sentinelPath); err != nil {
+				t.Fatalf("sentinel file affected by invalid cleanup pid %q: %v", pid, err)
+			}
+		})
+	}
+}

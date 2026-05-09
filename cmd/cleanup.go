@@ -24,6 +24,10 @@ Users typically do not need to call this command directly.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		pid := args[0]
+		if err := session.ValidateSessionPID(pid); err != nil {
+			return
+		}
+
 		configManager, err := config.NewConfigManager()
 		if err != nil {
 			// Silently exit - this is called during shell exit

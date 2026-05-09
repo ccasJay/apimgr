@@ -18,8 +18,43 @@ type SessionMarker struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// ValidateSessionPID validates a session PID used in marker file operations.
+func ValidateSessionPID(pid string) error {
+	trimmed := strings.TrimSpace(pid)
+	if trimmed == "" {
+		return fmt.Errorf("invalid session pid: empty")
+	}
+	if trimmed != pid {
+		return fmt.Errorf("invalid session pid: %q", pid)
+	}
+
+	parsed, err := strconv.Atoi(trimmed)
+	if err != nil || parsed <= 0 {
+		return fmt.Errorf("invalid session pid: %q", pid)
+	}
+
+	if strconv.Itoa(parsed) != trimmed {
+		return fmt.Errorf("invalid session pid: %q", pid)
+	}
+
+	return nil
+}
+
+func sessionMarkerPath(configPath string, pid string) (string, error) {
+	if err := ValidateSessionPID(pid); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(filepath.Dir(configPath), fmt.Sprintf("session-%s", pid)), nil
+}
+
 // CreateSessionMarker creates a session marker file for local mode
 func CreateSessionMarker(configPath string, pid string, alias string) error {
+	markerPath, err := sessionMarkerPath(configPath, pid)
+	if err != nil {
+		return fmt.Errorf("invalid session marker pid: %w", err)
+	}
+
 	marker := SessionMarker{
 		PID:       pid,
 		Alias:     alias,
@@ -31,7 +66,6 @@ func CreateSessionMarker(configPath string, pid string, alias string) error {
 		return fmt.Errorf("failed to serialize session marker: %v", err)
 	}
 
-	markerPath := filepath.Join(filepath.Dir(configPath), fmt.Sprintf("session-%s", pid))
 	if err := os.WriteFile(markerPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write session marker: %v", err)
 	}
@@ -41,8 +75,12 @@ func CreateSessionMarker(configPath string, pid string, alias string) error {
 
 // CleanupSession removes a session marker file
 func CleanupSession(configPath string, pid string) error {
-	markerPath := filepath.Join(filepath.Dir(configPath), fmt.Sprintf("session-%s", pid))
-	err := os.Remove(markerPath)
+	markerPath, err := sessionMarkerPath(configPath, pid)
+	if err != nil {
+		return fmt.Errorf("invalid session marker pid: %w", err)
+	}
+
+	err = os.Remove(markerPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove session marker: %v", err)
 	}
