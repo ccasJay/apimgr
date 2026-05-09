@@ -770,6 +770,80 @@ func TestRestoreClaudeToGlobalNoActive(t *testing.T) {
 	}
 }
 
+func TestRestoreClaudeToGlobalIgnoresAPIMGRACTIVEOverride(t *testing.T) {
+	t.Setenv("APIMGR_ACTIVE", "local-alias")
+	tempDir := t.TempDir()
+
+	fakeHome, cleanup := setupTestClaudeEnv(t, tempDir)
+	defer cleanup()
+
+	claudeSettingsPath := filepath.Join(fakeHome, ".claude", "settings.json")
+	initialSettings := map[string]interface{}{
+		"env": map[string]interface{}{
+			"ANTHROPIC_API_KEY":  "local-key",
+			"ANTHROPIC_BASE_URL": "https://local.example.com",
+			"ANTHROPIC_MODEL":    "local-model",
+			"OTHER_VAR":          "keep-this",
+		},
+	}
+	initialData, _ := json.MarshalIndent(initialSettings, "", "  ")
+	if err := os.WriteFile(claudeSettingsPath, initialData, 0600); err != nil {
+		t.Fatalf("Failed to write initial Claude settings: %v", err)
+	}
+
+	configPath := filepath.Join(tempDir, "config.json")
+	configFile := models.File{
+		Active: "global-alias",
+		Configs: []models.APIConfig{
+			{
+				Alias:   "global-alias",
+				APIKey:  "global-key",
+				BaseURL: "https://global.example.com",
+				Model:   "global-model",
+			},
+			{
+				Alias:   "local-alias",
+				APIKey:  "local-key",
+				BaseURL: "https://local.example.com",
+				Model:   "local-model",
+			},
+		},
+	}
+	configData, _ := json.MarshalIndent(configFile, "", "  ")
+	if err := os.WriteFile(configPath, configData, 0600); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	cm := &Manager{configPath: configPath}
+	if err := cm.RestoreClaudeToGlobal(); err != nil {
+		t.Fatalf("RestoreClaudeToGlobal() error: %v", err)
+	}
+
+	data, err := os.ReadFile(claudeSettingsPath)
+	if err != nil {
+		t.Fatalf("Failed to read Claude settings: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("Failed to parse Claude settings: %v", err)
+	}
+
+	env := settings["env"].(map[string]interface{})
+	if env["ANTHROPIC_API_KEY"] != "global-key" {
+		t.Fatalf("ANTHROPIC_API_KEY = %v, want global-key", env["ANTHROPIC_API_KEY"])
+	}
+	if env["ANTHROPIC_BASE_URL"] != "https://global.example.com" {
+		t.Fatalf("ANTHROPIC_BASE_URL = %v, want https://global.example.com", env["ANTHROPIC_BASE_URL"])
+	}
+	if env["ANTHROPIC_MODEL"] != "global-model" {
+		t.Fatalf("ANTHROPIC_MODEL = %v, want global-model", env["ANTHROPIC_MODEL"])
+	}
+	if env["OTHER_VAR"] != "keep-this" {
+		t.Fatalf("OTHER_VAR = %v, want keep-this", env["OTHER_VAR"])
+	}
+}
+
 // Feature: switch-local-mode-fix, Property 13: Load-active cleans up stale sessions
 // Validates: Requirements 4.3
 // For any session marker files with non-existent PIDs, executing `apimgr load-active` should delete

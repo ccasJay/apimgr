@@ -129,6 +129,26 @@ func TestGetActiveEnvOverride(t *testing.T) {
 	}
 }
 
+func TestGetGlobalActiveIgnoresEnvOverride(t *testing.T) {
+	cm := setupTestConfig(t)
+	cm.Add(models.APIConfig{Alias: "global", APIKey: "sk-global"})
+	cm.Add(models.APIConfig{Alias: "local", APIKey: "sk-local"})
+
+	if err := cm.SetActive("global"); err != nil {
+		t.Fatalf("SetActive() error: %v", err)
+	}
+
+	t.Setenv("APIMGR_ACTIVE", "local")
+
+	active, err := cm.GetGlobalActive()
+	if err != nil {
+		t.Fatalf("GetGlobalActive() unexpected error: %v", err)
+	}
+	if active.Alias != "global" {
+		t.Errorf("GetGlobalActive().Alias = %q, want %q", active.Alias, "global")
+	}
+}
+
 // TestSetActive tests setting the active configuration
 func TestSetActive(t *testing.T) {
 	tests := []struct {

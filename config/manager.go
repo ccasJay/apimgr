@@ -372,6 +372,16 @@ func (cm *Manager) SetActive(alias string) error {
 
 // GetActive returns the active configuration
 func (cm *Manager) GetActive() (*models.APIConfig, error) {
+	return cm.getActiveConfig(true)
+}
+
+// GetGlobalActive returns the persisted global active configuration.
+// Unlike GetActive, it ignores the APIMGR_ACTIVE environment override.
+func (cm *Manager) GetGlobalActive() (*models.APIConfig, error) {
+	return cm.getActiveConfig(false)
+}
+
+func (cm *Manager) getActiveConfig(includeEnvOverride bool) (*models.APIConfig, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -382,8 +392,10 @@ func (cm *Manager) GetActive() (*models.APIConfig, error) {
 
 	activeAlias := configFile.Active
 	// Check environment variable override
-	if envActive := os.Getenv("APIMGR_ACTIVE"); envActive != "" {
-		activeAlias = envActive
+	if includeEnvOverride {
+		if envActive := os.Getenv("APIMGR_ACTIVE"); envActive != "" {
+			activeAlias = envActive
+		}
 	}
 
 	if activeAlias == "" {
@@ -751,7 +763,7 @@ func (cm *Manager) syncClaudeSettingsFile(claudeSettingsPath string, cfg *models
 // If no global active configuration exists, it clears the ANTHROPIC_* env vars from Claude Code settings.
 func (cm *Manager) RestoreClaudeToGlobal() error {
 	// Get global active configuration
-	activeConfig, err := cm.GetActive()
+	activeConfig, err := cm.GetGlobalActive()
 	if err != nil {
 		// No global active configuration, clear Claude Code settings
 		return cm.clearClaudeSettings()
