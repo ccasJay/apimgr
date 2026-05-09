@@ -18,24 +18,30 @@ const EncryptedPrefix = "ENC:"
 
 // KeyManager handles encryption and decryption of API keys
 type KeyManager struct {
-	key []byte
+	primaryKey   []byte
+	fallbackKeys [][]byte
 }
 
 // NewKeyManager creates a new KeyManager with a derived key
 func NewKeyManager() (*KeyManager, error) {
-	// Derive key from machine-specific data
-	key, err := deriveKey()
+	primaryKey, err := deriveCurrentKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive encryption key: %w", err)
 	}
 
+	legacyKey, err := deriveLegacyKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive legacy encryption key: %w", err)
+	}
+
 	return &KeyManager{
-		key: key,
+		primaryKey:   primaryKey,
+		fallbackKeys: [][]byte{legacyKey},
 	}, nil
 }
 
-// deriveKey generates an encryption key based on machine-specific data
-func deriveKey() ([]byte, error) {
+// deriveLegacyKey generates the legacy encryption key based on machine-specific data.
+func deriveLegacyKey() ([]byte, error) {
 	// Use a combination of machine ID and user home directory for key derivation
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -56,13 +62,52 @@ func deriveKey() ([]byte, error) {
 	return hash[:], nil
 }
 
+// deriveCurrentKey generates the current encryption key from a persistent random key file.
+func deriveCurrentKey() ([]byte, error) {
+	keyFile, err := GetOrCreateKeyFile()
+	if err != nil {
+		return nil, err
+	}
+
+	keyMaterial, err := os.ReadFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
+	}
+	if len(keyMaterial) != 32 {
+		return nil, fmt.Errorf("invalid key file length: got %d, want 32", len(keyMaterial))
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "unknown"
+	}
+
+	seed := append([]byte{}, keyMaterial...)
+	seed = append(seed, []byte("|apimgr|local-key-derivation-v2|")...)
+	seed = append(seed, []byte(homeDir)...)
+	seed = append(seed, '|')
+	seed = append(seed, []byte(hostname)...)
+
+	hash := sha256.Sum256(seed)
+	return hash[:], nil
+}
+
+func deriveKey() ([]byte, error) {
+	return deriveCurrentKey()
+}
+
 // Encrypt encrypts the plaintext API key
 func (km *KeyManager) Encrypt(plaintext string) (string, error) {
 	if plaintext == "" {
 		return "", nil
 	}
 
-	block, err := aes.NewCipher(km.key)
+	block, err := aes.NewCipher(km.primaryKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -104,28 +149,49 @@ func (km *KeyManager) Decrypt(ciphertext string) (string, error) {
 		return "", fmt.Errorf("failed to decode ciphertext: %w", err)
 	}
 
-	block, err := aes.NewCipher(km.key)
+	var lastErr error
+	keys := make([][]byte, 0, 1+len(km.fallbackKeys))
+	keys = append(keys, km.primaryKey)
+	keys = append(keys, km.fallbackKeys...)
+
+	for _, key := range keys {
+		plaintext, err := decryptWithKey(key, decoded)
+		if err == nil {
+			return string(plaintext), nil
+		}
+		lastErr = err
+	}
+
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to decrypt: %w", lastErr)
+	}
+
+	return "", fmt.Errorf("failed to decrypt")
+}
+
+func decryptWithKey(key []byte, decoded []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", fmt.Errorf("failed to create cipher: %w", err)
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("failed to create GCM: %w", err)
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
 	nonceSize := gcm.NonceSize()
 	if len(decoded) < nonceSize {
-		return "", fmt.Errorf("ciphertext too short")
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 
 	nonce, ciphertextBytes := decoded[:nonceSize], decoded[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertextBytes, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to decrypt: %w", err)
+		return nil, err
 	}
 
-	return string(plaintext), nil
+	return plaintext, nil
 }
 
 // IsEncrypted checks if a string appears to be encrypted

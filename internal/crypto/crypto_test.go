@@ -1,9 +1,46 @@
 package crypto
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"io"
 )
+
+func encryptWithRawKey(t *testing.T, key []byte, plaintext string) string {
+	t.Helper()
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("aes.NewCipher() error: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("cipher.NewGCM() error: %v", err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		t.Fatalf("io.ReadFull() error: %v", err)
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return EncryptedPrefix + base64.StdEncoding.EncodeToString(ciphertext)
+}
+
+func setupCryptoHome(t *testing.T) string {
+	t.Helper()
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+	return homeDir
+}
 
 func TestKeyManager(t *testing.T) {
 	km, err := NewKeyManager()
@@ -159,29 +196,47 @@ func TestIsEncrypted(t *testing.T) {
 }
 
 func TestKeyDerivation(t *testing.T) {
-	// Test that key derivation is consistent
-	key1, err := deriveKey()
+	setupCryptoHome(t)
+
+	legacyKey1, err := deriveLegacyKey()
 	if err != nil {
-		t.Fatalf("First key derivation failed: %v", err)
+		t.Fatalf("First legacy key derivation failed: %v", err)
 	}
 
-	key2, err := deriveKey()
+	legacyKey2, err := deriveLegacyKey()
 	if err != nil {
-		t.Fatalf("Second key derivation failed: %v", err)
+		t.Fatalf("Second legacy key derivation failed: %v", err)
+	}
+	if string(legacyKey1) != string(legacyKey2) {
+		t.Errorf("Legacy key derivation is not consistent")
+	}
+	if len(legacyKey1) != 32 {
+		t.Errorf("Expected 32-byte legacy key, got %d bytes", len(legacyKey1))
 	}
 
-	// Keys should be identical when derived multiple times
-	if string(key1) != string(key2) {
-		t.Errorf("Key derivation is not consistent")
+	currentKey1, err := deriveCurrentKey()
+	if err != nil {
+		t.Fatalf("First current key derivation failed: %v", err)
 	}
 
-	// Key should be 32 bytes for AES-256
-	if len(key1) != 32 {
-		t.Errorf("Expected 32-byte key, got %d bytes", len(key1))
+	currentKey2, err := deriveCurrentKey()
+	if err != nil {
+		t.Fatalf("Second current key derivation failed: %v", err)
+	}
+	if string(currentKey1) != string(currentKey2) {
+		t.Errorf("Current key derivation is not consistent")
+	}
+	if len(currentKey1) != 32 {
+		t.Errorf("Expected 32-byte current key, got %d bytes", len(currentKey1))
+	}
+	if string(currentKey1) == string(legacyKey1) {
+		t.Errorf("Current and legacy keys should differ")
 	}
 }
 
 func TestKeyManagerConsistency(t *testing.T) {
+	setupCryptoHome(t)
+
 	// Create two KeyManagers - they should use the same derived key
 	km1, err := NewKeyManager()
 	if err != nil {
@@ -212,6 +267,64 @@ func TestKeyManagerConsistency(t *testing.T) {
 	}
 }
 
+func TestKeyManagerDecryptsLegacyCiphertext(t *testing.T) {
+	setupCryptoHome(t)
+
+	legacyKey, err := deriveLegacyKey()
+	if err != nil {
+		t.Fatalf("deriveLegacyKey() error: %v", err)
+	}
+
+	legacyCiphertext := encryptWithRawKey(t, legacyKey, "legacy-secret")
+	km, err := NewKeyManager()
+	if err != nil {
+		t.Fatalf("NewKeyManager() error: %v", err)
+	}
+
+	plaintext, err := km.Decrypt(legacyCiphertext)
+	if err != nil {
+		t.Fatalf("Decrypt() error: %v", err)
+	}
+	if plaintext != "legacy-secret" {
+		t.Fatalf("Decrypt() = %q, want legacy-secret", plaintext)
+	}
+}
+
+func TestNewCiphertextUsesCurrentKey(t *testing.T) {
+	setupCryptoHome(t)
+
+	km, err := NewKeyManager()
+	if err != nil {
+		t.Fatalf("NewKeyManager() error: %v", err)
+	}
+	legacyKey, err := deriveLegacyKey()
+	if err != nil {
+		t.Fatalf("deriveLegacyKey() error: %v", err)
+	}
+
+	ciphertext, err := km.Encrypt("current-secret")
+	if err != nil {
+		t.Fatalf("Encrypt() error: %v", err)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(ciphertext, EncryptedPrefix))
+	if err != nil {
+		t.Fatalf("DecodeString() error: %v", err)
+	}
+
+	if _, err := decryptWithKey(legacyKey, decoded); err == nil {
+		t.Fatal("legacy key should not decrypt ciphertext encrypted with current key")
+	}
+
+	plaintext, err := km.Decrypt(ciphertext)
+	if err != nil {
+		t.Fatalf("Decrypt() error: %v", err)
+	}
+	if plaintext != "current-secret" {
+		t.Fatalf("Decrypt() = %q, want current-secret", plaintext)
+	}
+}
+
 func BenchmarkEncrypt(b *testing.B) {
 	km, _ := NewKeyManager()
 	plaintext := "test-fake-key-benchmark-test-key-123456789"
@@ -234,6 +347,8 @@ func BenchmarkDecrypt(b *testing.B) {
 }
 
 func TestGetOrCreateKeyFile(t *testing.T) {
+	setupCryptoHome(t)
+
 	// This test might need to be skipped in CI environments
 	t.Run("Create and retrieve key file", func(t *testing.T) {
 		keyFile1, err := GetOrCreateKeyFile()
