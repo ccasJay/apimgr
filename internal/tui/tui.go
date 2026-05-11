@@ -35,7 +35,14 @@ func Run() error {
 
 	p := tea.NewProgram(m, opts...)
 
-	_, err = p.Run()
+	finalModel, err := p.Run()
+	if finalModel != nil {
+		if tuiModel, ok := finalModel.(Model); ok {
+			if cleanupErr := tuiModel.cleanupLocalSessionMarker(); cleanupErr != nil && err == nil {
+				err = cleanupErr
+			}
+		}
+	}
 	return err
 }
 

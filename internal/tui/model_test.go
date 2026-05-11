@@ -2,9 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ccasJay/apimgr/config"
 	"github.com/ccasJay/apimgr/config/models"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -679,6 +682,118 @@ func TestModelSwitchedMsgHandling(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConfigSwitchedMsgHandling(t *testing.T) {
+	tests := []struct {
+		name              string
+		initialActiveAlias string
+		msg               ConfigSwitchedMsg
+		expectActiveAlias string
+		expectMessage     string
+	}{
+		{
+			name:               "local switch keeps global active alias",
+			initialActiveAlias: "global-config",
+			msg: ConfigSwitchedMsg{
+				Alias:   "local-config",
+				IsLocal: true,
+			},
+			expectActiveAlias: "global-config",
+			expectMessage:     "已本地切换到: local-config (仅当前终端会话)",
+		},
+		{
+			name:               "global switch updates active alias",
+			initialActiveAlias: "old-config",
+			msg: ConfigSwitchedMsg{
+				Alias:   "new-config",
+				IsLocal: false,
+			},
+			expectActiveAlias: "new-config",
+			expectMessage:     "已全局切换到: new-config",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Model{
+				activeAlias: tt.initialActiveAlias,
+				viewState:   ViewMain,
+			}
+
+			newModel, _ := m.Update(tt.msg)
+			updatedModel := newModel.(Model)
+
+			if updatedModel.activeAlias != tt.expectActiveAlias {
+				t.Errorf("Update(ConfigSwitchedMsg) activeAlias = %q, want %q", updatedModel.activeAlias, tt.expectActiveAlias)
+			}
+			if updatedModel.message != tt.expectMessage {
+				t.Errorf("Update(ConfigSwitchedMsg) message = %q, want %q", updatedModel.message, tt.expectMessage)
+			}
+		})
+	}
+}
+
+func TestEnsureAndCleanupLocalSessionMarker(t *testing.T) {
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.json")
+	claudeDir := filepath.Join(tempDir, ".claude")
+	claudeSettingsPath := filepath.Join(claudeDir, "settings.json")
+
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("failed to create claude dir: %v", err)
+	}
+
+	configContent := `{
+	  "active": "global-alias",
+	  "configs": [
+	    {
+	      "alias": "global-alias",
+	      "provider": "anthropic",
+	      "auth_token": "global-token",
+	      "base_url": "https://global.example.com"
+	    }
+	  ]
+	}`
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	settingsContent := `{
+	  "env": {
+	    "ANTHROPIC_AUTH_TOKEN": "global-token",
+	    "ANTHROPIC_BASE_URL": "https://global.example.com"
+	  }
+	}`
+	if err := os.WriteFile(claudeSettingsPath, []byte(settingsContent), 0600); err != nil {
+		t.Fatalf("failed to write settings: %v", err)
+	}
+
+	t.Setenv("HOME", tempDir)
+	cm := config.NewConfigManagerWithPath(configPath)
+	m := Model{configManager: cm}
+
+	if err := m.ensureLocalSessionMarker(); err != nil {
+		t.Fatalf("ensureLocalSessionMarker() error: %v", err)
+	}
+	if m.sessionPID == "" {
+		t.Fatal("ensureLocalSessionMarker() should set sessionPID")
+	}
+
+	markerPath := filepath.Join(tempDir, "session-"+m.sessionPID)
+	if _, err := os.Stat(markerPath); err != nil {
+		t.Fatalf("expected marker file to exist: %v", err)
+	}
+
+	if err := m.cleanupLocalSessionMarker(); err != nil {
+		t.Fatalf("cleanupLocalSessionMarker() error: %v", err)
+	}
+	if m.sessionPID != "" {
+		t.Fatal("cleanupLocalSessionMarker() should clear sessionPID")
+	}
+	if _, err := os.Stat(markerPath); !os.IsNotExist(err) {
+		t.Fatalf("expected marker file to be removed, got err=%v", err)
 	}
 }
 

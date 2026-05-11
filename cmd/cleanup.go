@@ -41,5 +41,17 @@ Users typically do not need to call this command directly.`,
 			// Exit with 0 to not interfere with shell exit
 			return
 		}
+
+		hasActiveSessions, err := session.HasActiveLocalSessions(configManager.GetConfigPath())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to check active sessions: %v\n", err)
+			return
+		}
+
+		if !hasActiveSessions {
+			if err := configManager.RestoreClaudeToGlobal(); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to restore global configuration: %v\n", err)
+			}
+		}
 	},
 }

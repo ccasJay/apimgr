@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/ccasJay/apimgr/config"
 	"github.com/ccasJay/apimgr/config/models"
+	"github.com/ccasJay/apimgr/config/session"
 	"github.com/ccasJay/apimgr/internal/compatibility"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -78,6 +80,7 @@ type Model struct {
 	modelCursor int        // Cursor position in model selection list
 	modelList   []string   // Available models for current config
 	switchType  SwitchType // Current switch type (local or global)
+	sessionPID  string     // Current TUI-local session marker PID
 
 	// Help view scroll state
 	helpScrollOffset int // Scroll offset for help view
@@ -176,13 +179,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			m.errorMsg = msg.Err.Error()
 		} else {
-			// Always update active alias to reflect the switch (local or global)
-			m.activeAlias = msg.Alias
 			if msg.IsLocal {
 				m.message = "已本地切换到: " + msg.Alias + " (仅当前终端会话)"
 			} else {
+				m.activeAlias = msg.Alias
 				m.message = "已全局切换到: " + msg.Alias
 			}
+
+			return m, loadConfigs(m.configManager)
 		}
 		return m, nil
 
@@ -235,10 +239,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// If activation was requested (local or global switch), update active alias
 			if msg.Activate {
-				m.activeAlias = msg.Alias
 				if msg.IsLocal {
 					m.message += " (本地生效)"
 				} else {
+					m.activeAlias = msg.Alias
 					m.message += " (全局生效)"
 				}
 			}
@@ -391,6 +395,11 @@ func (m Model) handleMainViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = ""
 			m.errorMsg = ""
 
+			if err := m.ensureLocalSessionMarker(); err != nil {
+				m.errorMsg = err.Error()
+				return m, nil
+			}
+
 			// Check if config supports multiple models
 			if len(cfg.Models) > 1 {
 				// Initialize model selection for local switch
@@ -529,6 +538,11 @@ func (m Model) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Clear previous messages
 			m.message = ""
 			m.errorMsg = ""
+
+			if err := m.ensureLocalSessionMarker(); err != nil {
+				m.errorMsg = err.Error()
+				return m, nil
+			}
 
 			// Check if config supports multiple models
 			if len(cfg.Models) > 1 {
@@ -781,6 +795,48 @@ func loadConfigs(cm *config.Manager) tea.Cmd {
 
 // errMsg is an error message type
 type errMsg string
+
+// ensureLocalSessionMarker creates a session marker for the current TUI process once.
+func (m *Model) ensureLocalSessionMarker() error {
+	if m.sessionPID != "" {
+		return nil
+	}
+
+	pid := fmt.Sprintf("%d", os.Getpid())
+	if err := session.CreateSessionMarker(m.configManager.GetConfigPath(), pid, "tui-local"); err != nil {
+		return err
+	}
+
+	m.sessionPID = pid
+	return nil
+}
+
+// cleanupLocalSessionMarker removes the TUI session marker and restores global settings if needed.
+func (m *Model) cleanupLocalSessionMarker() error {
+	if m.sessionPID == "" {
+		return nil
+	}
+
+	pid := m.sessionPID
+	m.sessionPID = ""
+
+	if err := session.CleanupSession(m.configManager.GetConfigPath(), pid); err != nil {
+		return err
+	}
+
+	hasActiveSessions, err := session.HasActiveLocalSessions(m.configManager.GetConfigPath())
+	if err != nil {
+		return err
+	}
+
+	if !hasActiveSessions {
+		if err := m.configManager.RestoreClaudeToGlobal(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 // switchLocalConfig creates a command to switch config locally (Claude Code only)
 func switchLocalConfig(cm *config.Manager, cfg *models.APIConfig) tea.Cmd {
