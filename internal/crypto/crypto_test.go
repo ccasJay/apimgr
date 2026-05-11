@@ -5,11 +5,11 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"io"
 )
 
 func encryptWithRawKey(t *testing.T, key []byte, plaintext string) string {

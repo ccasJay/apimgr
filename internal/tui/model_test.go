@@ -687,11 +687,11 @@ func TestModelSwitchedMsgHandling(t *testing.T) {
 
 func TestConfigSwitchedMsgHandling(t *testing.T) {
 	tests := []struct {
-		name              string
+		name               string
 		initialActiveAlias string
-		msg               ConfigSwitchedMsg
-		expectActiveAlias string
-		expectMessage     string
+		msg                ConfigSwitchedMsg
+		expectActiveAlias  string
+		expectMessage      string
 	}{
 		{
 			name:               "local switch keeps global active alias",
